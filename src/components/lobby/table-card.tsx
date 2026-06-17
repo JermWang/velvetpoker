@@ -52,8 +52,22 @@ export function TableCard({ table }: { table: TableCardData }) {
 
         {/* at-a-glance stats */}
         <div className="relative mt-5 grid grid-cols-2 gap-3 text-sm">
-          <Stat label="Blinds" value={`${formatAmount(table.asset, table.smallBlind)} / ${formatAmount(table.asset, table.bigBlind)}`} />
-          <Stat label="Buy-in" value={`${formatAmount(table.asset, table.minBuyIn)}–${formatAmount(table.asset, table.maxBuyIn)}`} />
+          <Stat
+            label="Blinds"
+            value={
+              table.isDemo
+                ? `${formatAmount(table.asset, table.smallBlind)} / ${formatAmount(table.asset, table.bigBlind)}`
+                : `${formatAmount(table.asset, table.smallBlind)} / ${formatAmount(table.asset, table.bigBlind)} ${table.asset}`
+            }
+          />
+          <Stat
+            label="Buy-in"
+            value={
+              table.isDemo
+                ? "Free"
+                : `${formatAmount(table.asset, table.minBuyIn)}–${formatAmount(table.asset, table.maxBuyIn)} ${table.asset}`
+            }
+          />
         </div>
 
         {/* seat occupancy */}

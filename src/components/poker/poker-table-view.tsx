@@ -79,6 +79,9 @@ export function PokerTableView(props: PokerTableViewProps) {
     }
   }
 
+  // Demo tables use free chips; real tables are labeled in their asset.
+  const unit = props.demo ? "chips" : props.asset;
+
   return (
     <div className="space-y-6">
       {props.demo && (
@@ -95,7 +98,7 @@ export function PokerTableView(props: PokerTableViewProps) {
               ? `${formatAmount(props.asset, BigInt(table.smallBlind))} / ${formatAmount(
                   props.asset,
                   BigInt(table.bigBlind),
-                )} ${props.asset} · ${table.status}`
+                )} ${unit} · ${table.status}`
               : state.connected
                 ? "Loading table…"
                 : "Connecting…"}
@@ -143,7 +146,7 @@ export function PokerTableView(props: PokerTableViewProps) {
             <div className="rounded-full border border-velvet/30 bg-charcoal-900/40 px-4 py-1.5">
               <span className="text-xs text-ash">Pot </span>
               <span className="font-mono text-velvet">
-                {formatAmount(props.asset, BigInt(table.totalPot))} {props.asset}
+                {formatAmount(props.asset, BigInt(table.totalPot))} {unit}
               </span>
             </div>
           )}
@@ -187,7 +190,7 @@ export function PokerTableView(props: PokerTableViewProps) {
               .map((r) => (
                 <li key={r.seat} className="text-ivory">
                   Seat {r.seat + 1} wins {formatAmount(props.asset, BigInt(r.amountWon))}{" "}
-                  {props.asset} — {r.handDescription}
+                  {unit} — {r.handDescription}
                 </li>
               ))}
           </ul>
@@ -208,6 +211,7 @@ export function PokerTableView(props: PokerTableViewProps) {
           minBuyIn={BigInt(props.minBuyIn)}
           maxBuyIn={BigInt(props.maxBuyIn)}
           onBuyIn={buyIn}
+          demo={props.demo}
         />
       ) : isYourTurn && table ? (
         <ActionBar
