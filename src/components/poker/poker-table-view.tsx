@@ -23,24 +23,39 @@ export interface PokerTableViewProps {
   authQuery: string;
   /** Null when the viewer is an unauthenticated spectator. */
   youUserId: string | null;
+  /** Free-play demo table — free chips, no real money. */
+  demo?: boolean;
+  /** Guest free-play: generate an ephemeral id and connect as a guest. */
+  guestMode?: boolean;
 }
 
 export function PokerTableView(props: PokerTableViewProps) {
+  // Guests get a stable ephemeral id for the session; it's the playerId the ws
+  // seats them under (demo tables only) and what we match "your seat" against.
+  const [guestId] = useState<string | null>(() =>
+    props.guestMode
+      ? `g${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`
+      : null,
+  );
+  const youUserId = props.guestMode ? guestId : props.youUserId;
+  const authQuery =
+    props.guestMode && guestId ? `guest=${guestId}` : props.authQuery;
+
   const { state, send } = useTableSocket({
     wsUrl: props.wsUrl,
     tableId: props.tableId,
-    authQuery: props.authQuery,
+    authQuery,
   });
   const [chatInput, setChatInput] = useState("");
 
-  const isSpectator = props.youUserId == null;
+  const isSpectator = youUserId == null;
   const table = state.table;
   const yourSeat = useMemo(
     () =>
-      props.youUserId == null
+      youUserId == null
         ? null
-        : (table?.seats.find((s) => s.playerId === props.youUserId) ?? null),
-    [table, props.youUserId],
+        : (table?.seats.find((s) => s.playerId === youUserId) ?? null),
+    [table, youUserId],
   );
   const seated = !!yourSeat;
   const isYourTurn =
@@ -66,6 +81,12 @@ export function PokerTableView(props: PokerTableViewProps) {
 
   return (
     <div className="space-y-6">
+      {props.demo && (
+        <div className="rounded-xl border border-gold/25 bg-gold/[0.04] px-4 py-2.5 text-center text-sm text-gold/90">
+          Free play — demo chips, no wallet or deposit needed. Nothing here is
+          real money.
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl text-ivory">{props.tableName}</h1>
@@ -137,8 +158,8 @@ export function PokerTableView(props: PokerTableViewProps) {
               asset={props.asset}
               isDealer={table.dealerSeat === s.seat}
               isToAct={table.toActSeat === s.seat}
-              isYou={s.playerId === props.youUserId}
-              holeCards={s.playerId === props.youUserId ? state.holeCards : null}
+              isYou={s.playerId === youUserId}
+              holeCards={s.playerId === youUserId ? state.holeCards : null}
             />
           ))}
         </div>

@@ -357,6 +357,8 @@ model PokerTable {
   actionTimeoutSeconds Int             @default(30)
   spectatorsAllowed    Boolean         @default(true)
   rakeBps              Int             @default(0)
+  // Free-play demo table: free chips, no ledger/real money, open to guests.
+  isDemo               Boolean         @default(false)
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
 

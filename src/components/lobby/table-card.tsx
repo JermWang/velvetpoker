@@ -15,6 +15,7 @@ export interface TableCardData {
   seatsOccupied: number;
   visibility: "PUBLIC" | "PRIVATE";
   status: string;
+  isDemo?: boolean;
 }
 
 const SUIT = "♠";
@@ -38,7 +39,7 @@ export function TableCard({ table }: { table: TableCardData }) {
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5">
             <span className="rounded-full border border-gold/30 bg-gold/10 px-2.5 py-0.5 text-xs font-medium text-gold">
-              {table.asset}
+              {table.isDemo ? "FREE" : table.asset}
             </span>
             <span className="flex items-center gap-1 text-[11px] text-ash">
               <span
@@ -80,12 +81,14 @@ export function TableCard({ table }: { table: TableCardData }) {
         </div>
 
         <div className="relative mt-5 flex items-center justify-between">
-          {table.visibility === "PRIVATE" ? (
+          {table.isDemo ? (
+            <span className="text-xs text-gold/80">Free play · no deposit</span>
+          ) : table.visibility === "PRIVATE" ? (
             <span className="text-xs text-ash">Private · invite only</span>
           ) : (
             <span className="text-xs text-ash">Open table</span>
           )}
-          <Button size="sm">Take a seat</Button>
+          <Button size="sm">{table.isDemo ? "Play free" : "Take a seat"}</Button>
         </div>
       </div>
     </Link>

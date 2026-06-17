@@ -22,6 +22,40 @@ export default async function TablePage({
   });
   if (!table || table.status === "CLOSED") notFound();
 
+  // WS auth for an authenticated user: the site (Vercel) and the ws server
+  // (Railway) are on different hosts, so the `privy-token` cookie isn't sent on
+  // the cross-origin WebSocket handshake. We read it here on the server and pass
+  // it as `?token=` instead — the ws verifies it the same way. Dev cookie fallback.
+  const privyConfigured = Boolean(env.privyAppId && env.privyAppSecret);
+  const privyToken = cookies().get("privy-token")?.value;
+  const devEmail = cookies().get("velvet_dev_user")?.value;
+  const userAuthQuery = privyConfigured
+    ? privyToken
+      ? `token=${encodeURIComponent(privyToken)}`
+      : ""
+    : !env.isProduction && devEmail
+      ? `dev=${encodeURIComponent(devEmail)}`
+      : "";
+
+  // Free-play demo table: anyone plays for free — logged in or as a guest — with
+  // no compliance gate and no real money. Guests get an ephemeral client-side id.
+  if (table.isDemo) {
+    const common = {
+      tableId: table.id,
+      tableName: table.name,
+      asset: table.asset,
+      minBuyIn: table.minBuyIn.toString(),
+      maxBuyIn: table.maxBuyIn.toString(),
+      wsUrl: env.wsUrl,
+      demo: true as const,
+    };
+    return user ? (
+      <PokerTableView {...common} authQuery={userAuthQuery} youUserId={user.id} />
+    ) : (
+      <PokerTableView {...common} authQuery="" youUserId={null} guestMode />
+    );
+  }
+
   // Visitors without a wallet may spectate (when the host allows it). They see
   // the live felt and public action but never take a seat or receive hole cards.
   if (!user) {
@@ -69,21 +103,6 @@ export default async function TablePage({
     );
   }
 
-  // WS auth: the site (Vercel) and the ws game server (Railway) are on different
-  // hosts, so the `privy-token` cookie isn't sent on the cross-origin WebSocket
-  // handshake. We read it here on the server and pass it as `?token=` instead —
-  // the ws verifies it the same way. Falls back to the dev cookie in development.
-  const privyConfigured = Boolean(env.privyAppId && env.privyAppSecret);
-  const privyToken = cookies().get("privy-token")?.value;
-  const devEmail = cookies().get("velvet_dev_user")?.value;
-  const authQuery = privyConfigured
-    ? privyToken
-      ? `token=${encodeURIComponent(privyToken)}`
-      : ""
-    : !env.isProduction && devEmail
-      ? `dev=${encodeURIComponent(devEmail)}`
-      : "";
-
   return (
     <PokerTableView
       tableId={table.id}
@@ -92,7 +111,7 @@ export default async function TablePage({
       minBuyIn={table.minBuyIn.toString()}
       maxBuyIn={table.maxBuyIn.toString()}
       wsUrl={env.wsUrl}
-      authQuery={authQuery}
+      authQuery={userAuthQuery}
       youUserId={user.id}
     />
   );

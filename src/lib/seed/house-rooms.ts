@@ -30,7 +30,48 @@ export const HOUSE_ROOMS: HouseRoom[] = [
   { code: "HOUSE-HIGH", name: "Velvet — High", sb: sol(0.1), bb: sol(0.2), min: sol(8), max: sol(20) },
 ];
 
+// Free-play demo table: free chips, no real money, open to wallet-less guests.
+const DEMO_ROOM = {
+  code: "DEMO-FREEPLAY",
+  name: "Velvet — Free Play",
+  sb: sol(0.01),
+  bb: sol(0.02),
+  min: sol(0.8),
+  max: sol(2),
+};
+
 export async function seedHouseRooms(): Promise<number> {
+  await prisma.pokerTable.upsert({
+    where: { inviteCode: DEMO_ROOM.code },
+    create: {
+      name: DEMO_ROOM.name,
+      asset: "SOL",
+      smallBlind: DEMO_ROOM.sb,
+      bigBlind: DEMO_ROOM.bb,
+      minBuyIn: DEMO_ROOM.min,
+      maxBuyIn: DEMO_ROOM.max,
+      maxSeats: 6,
+      visibility: "PUBLIC",
+      inviteCode: DEMO_ROOM.code,
+      status: "WAITING",
+      actionTimeoutSeconds: 30,
+      spectatorsAllowed: true,
+      rakeBps: 0,
+      isDemo: true,
+    },
+    update: {
+      name: DEMO_ROOM.name,
+      smallBlind: DEMO_ROOM.sb,
+      bigBlind: DEMO_ROOM.bb,
+      minBuyIn: DEMO_ROOM.min,
+      maxBuyIn: DEMO_ROOM.max,
+      visibility: "PUBLIC",
+      status: "WAITING",
+      rakeBps: 0,
+      isDemo: true,
+    },
+  });
+
   for (const r of HOUSE_ROOMS) {
     await prisma.pokerTable.upsert({
       where: { inviteCode: r.code },
@@ -61,5 +102,5 @@ export async function seedHouseRooms(): Promise<number> {
       },
     });
   }
-  return HOUSE_ROOMS.length;
+  return HOUSE_ROOMS.length + 1; // + the free-play demo table
 }

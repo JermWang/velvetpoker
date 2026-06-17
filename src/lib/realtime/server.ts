@@ -23,16 +23,20 @@ import { startBackgroundWorkers } from "@/lib/jobs/worker";
 
 interface Client {
   ws: WebSocket;
-  /** Null for unauthenticated spectators (read-only viewers). */
+  /** Null for unauthenticated spectators; a `guest:<id>` for free-play guests. */
   userId: string | null;
   displayName: string;
   tableId: string | null;
   isSpectator: boolean;
+  /** Unauthenticated free-play guest — may sit ONLY at demo tables, no ledger. */
+  isGuest: boolean;
 }
 
 interface RoomEntry {
   room: TableRoom;
   clients: Set<Client>;
+  /** Free-play demo table: free chips, no ledger, guests allowed. */
+  isDemo: boolean;
 }
 
 const rooms = new Map<string, RoomEntry>();
@@ -100,7 +104,8 @@ async function getOrCreateRoom(tableId: string): Promise<RoomEntry | null> {
     bigBlind: table.bigBlind,
     maxSeats: table.maxSeats,
     actionTimeoutSeconds: table.actionTimeoutSeconds,
-    rakeBps: table.rakeBps,
+    // Demo tables take no rake and never touch the ledger.
+    rakeBps: table.isDemo ? 0 : table.rakeBps,
   };
 
   const clients = new Set<Client>();
@@ -113,11 +118,13 @@ async function getOrCreateRoom(tableId: string): Promise<RoomEntry | null> {
     },
   });
 
-  // Persist hands (Hand/HandAction/HandResult/RngProof) + route settlement
-  // through the ledger.
-  attachHandPersistence(room, { id: table.id, asset: table.asset });
+  // Real-money tables persist hands + route settlement through the ledger.
+  // Demo tables run purely in memory: no ledger, no DB writes, free chips.
+  if (!table.isDemo) {
+    attachHandPersistence(room, { id: table.id, asset: table.asset });
+  }
 
-  const entry: RoomEntry = { room, clients };
+  const entry: RoomEntry = { room, clients, isDemo: table.isDemo };
   rooms.set(tableId, entry);
   return entry;
 }
@@ -162,9 +169,16 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
     return;
   }
 
-  // Authenticated player from here on (spectators returned above).
+  // Authenticated player or free-play guest from here on (spectators returned
+  // above). Guests carry a `guest:<id>` and may only act at demo tables.
   const userId = client.userId;
   if (userId == null) return;
+  if (client.isGuest && !entry.isDemo) {
+    return sendTo(client, {
+      t: "ERROR",
+      message: "Connect a wallet to play real-money tables",
+    });
+  }
 
   switch (event.t) {
     case "JOIN_TABLE": {
@@ -183,6 +197,31 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
         where: { id: event.tableId },
       });
       if (!table) break;
+
+      // Demo tables seat with free chips and never touch the ledger; the stack
+      // is clamped to the table's configured buy-in range.
+      if (entry.isDemo) {
+        const stack =
+          amount < table.minBuyIn
+            ? table.minBuyIn
+            : amount > table.maxBuyIn
+              ? table.maxBuyIn
+              : amount;
+        const seatNumber =
+          event.seatNumber ?? nextFreeSeat(room, table.maxSeats);
+        if (seatNumber === null) {
+          sendTo(client, { t: "ERROR", message: "No free seat" });
+          break;
+        }
+        room.sit({
+          playerId: userId,
+          displayName: client.displayName,
+          seatNumber,
+          stack,
+        });
+        break;
+      }
+
       try {
         // Lock funds available -> table-locked before seating.
         await lockBuyIn({
@@ -225,20 +264,23 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
       break;
     case "LEAVE_TABLE": {
       const returned = room.leave(userId);
-      const table = await prisma.pokerTable.findUnique({
-        where: { id: event.tableId },
-      });
-      if (table && returned > 0n) {
-        try {
-          await cashOutSeat({
-            userId,
-            asset: table.asset,
-            amount: returned,
-            tableId: table.id,
-            correlationId: `cashout:${userId}:${Date.now()}`,
-          });
-        } catch (err) {
-          console.error("[ws] cashOutSeat failed", err);
+      // Demo chips are free — nothing to settle back to the ledger.
+      if (!entry.isDemo && returned > 0n) {
+        const table = await prisma.pokerTable.findUnique({
+          where: { id: event.tableId },
+        });
+        if (table) {
+          try {
+            await cashOutSeat({
+              userId,
+              asset: table.asset,
+              amount: returned,
+              tableId: table.id,
+              correlationId: `cashout:${userId}:${Date.now()}`,
+            });
+          } catch (err) {
+            console.error("[ws] cashOutSeat failed", err);
+          }
         }
       }
       entry.clients.delete(client);
@@ -283,29 +325,52 @@ export function startServer(
   wss.on("connection", async (ws, req) => {
     const url = new URL(req.url ?? "/", `http://localhost:${port}`);
     const identity = await resolveIdentity(url, req.headers.cookie);
-    // Unauthenticated viewers may connect as read-only spectators (?spectate=1);
-    // everything else requires a valid identity.
+    // Connection modes (in priority order):
+    //  - authenticated user (Privy token / dev cookie)
+    //  - free-play guest (?guest=<id>) — may sit only at demo tables
+    //  - read-only spectator (?spectate=1)
     const wantsSpectate = url.searchParams.get("spectate") === "1";
-    if (!identity && !wantsSpectate) {
+    const guestParam = url.searchParams.get("guest");
+    const guestId =
+      guestParam && /^[A-Za-z0-9_-]{1,40}$/.test(guestParam)
+        ? `guest:${guestParam}`
+        : null;
+
+    if (!identity && !guestId && !wantsSpectate) {
       ws.send(encode({ t: "ERROR", message: "Unauthorized", code: "AUTH" }));
       ws.close();
       return;
     }
-    const client: Client = identity
-      ? {
-          ws,
-          userId: identity.userId,
-          displayName: identity.displayName,
-          tableId: null,
-          isSpectator: false,
-        }
-      : {
-          ws,
-          userId: null,
-          displayName: "Spectator",
-          tableId: null,
-          isSpectator: true,
-        };
+
+    let client: Client;
+    if (identity) {
+      client = {
+        ws,
+        userId: identity.userId,
+        displayName: identity.displayName,
+        tableId: null,
+        isSpectator: false,
+        isGuest: false,
+      };
+    } else if (guestId) {
+      client = {
+        ws,
+        userId: guestId,
+        displayName: `Guest ${guestId.slice(-4)}`,
+        tableId: null,
+        isSpectator: false,
+        isGuest: true,
+      };
+    } else {
+      client = {
+        ws,
+        userId: null,
+        displayName: "Spectator",
+        tableId: null,
+        isSpectator: true,
+        isGuest: false,
+      };
+    }
 
     ws.on("message", (data) => {
       void handleEvent(client, data.toString());
