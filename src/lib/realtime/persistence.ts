@@ -6,7 +6,8 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
-import { settleHandLedger } from "@/lib/ledger/ledger";
+import { settleHandLedger, type RakeSplit } from "@/lib/ledger/ledger";
+import { splitRakeThreeWays } from "@/lib/poker/rake";
 import type { Asset } from "@prisma/client";
 import type {
   HandCompletedInfo,
@@ -27,13 +28,59 @@ export async function persistHandSettled(
   // The room's handId is "tableId:handNumber"; resolve it to the DB Hand.id so
   // ledger entries link to the persisted Hand row (admin/history join on it).
   const dbHandId = await resolveDbHandId(table.id, s.handId);
+
+  // Split the rake three ways. The referral third is attributed to the referrers
+  // of contributing players, proportional to pot contribution; any slice for a
+  // player with no referrer stays with the house.
+  let rakeSplit: RakeSplit | undefined;
+  if (s.rake > 0n) {
+    const { team, buyback, referral } = splitRakeThreeWays(s.rake);
+    const totalContribution = s.contributions.reduce((a, c) => a + c.amount, 0n);
+
+    const playerIds = s.contributions.map((c) => c.playerId);
+    const users = playerIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: playerIds } },
+          select: { id: true, referredById: true },
+        })
+      : [];
+    const referrerOf = new Map(users.map((u) => [u.id, u.referredById]));
+
+    const payoutByReferrer = new Map<string, bigint>();
+    let referralDistributed = 0n;
+    if (referral > 0n && totalContribution > 0n) {
+      for (const c of s.contributions) {
+        const referrer = referrerOf.get(c.playerId);
+        if (!referrer) continue;
+        const share = (referral * c.amount) / totalContribution;
+        if (share > 0n) {
+          payoutByReferrer.set(
+            referrer,
+            (payoutByReferrer.get(referrer) ?? 0n) + share,
+          );
+          referralDistributed += share;
+        }
+      }
+    }
+    const referralUnattributed = referral - referralDistributed; // → house
+
+    rakeSplit = {
+      team: team + referralUnattributed,
+      buyback,
+      referralPayouts: [...payoutByReferrer].map(([referrerUserId, amount]) => ({
+        referrerUserId,
+        amount,
+      })),
+    };
+  }
+
   await settleHandLedger({
     asset: table.asset,
     tableId: table.id,
     handId: dbHandId,
     correlationId: `hand-settle:${dbHandId}`,
     deltas: s.deltas.map((d) => ({ userId: d.playerId, net: d.net })),
-    rake: s.rake,
+    rakeSplit,
   });
 }
 
@@ -138,15 +185,27 @@ export function attachHandPersistence(
   table: PersistTable,
   hooks?: { afterHandCompleted?: (info: HandCompletedInfo) => void },
 ): void {
-  room.onHandSettled = (s) =>
-    persistHandSettled(table, s).catch((e) =>
-      console.error("[persist] settle failed", e),
-    );
-  room.onHandStarted = (i) =>
-    persistHandStarted(i).catch((e) =>
+  // The hooks fire-and-forget from the engine, but the Hand row written at deal
+  // (persistHandStarted) MUST exist before settlement/completion link to it.
+  // Chain on the latest start so completion + settlement always observe it,
+  // closing a race that would otherwise drop a hand's settlement under fast play.
+  let startPersisted: Promise<unknown> = Promise.resolve();
+
+  room.onHandStarted = (i) => {
+    startPersisted = persistHandStarted(i).catch((e) =>
       console.error("[persist] start failed", e),
     );
+  };
+  room.onHandSettled = async (s) => {
+    await startPersisted;
+    try {
+      await persistHandSettled(table, s);
+    } catch (e) {
+      console.error("[persist] settle failed", e);
+    }
+  };
   room.onHandCompleted = async (i) => {
+    await startPersisted;
     try {
       await persistHandCompleted(i);
     } catch (e) {

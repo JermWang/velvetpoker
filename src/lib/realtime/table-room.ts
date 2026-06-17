@@ -29,6 +29,7 @@ import {
   ALGORITHM,
 } from "@/lib/poker/rng";
 import type { ActionType, Card } from "@/lib/poker/types";
+import { computeRake } from "@/lib/poker/rake";
 import type { ServerEvent, WireSeat, WireTableState } from "./events";
 
 export interface RoomConfig {
@@ -53,8 +54,12 @@ interface RoomSeat {
 
 export interface HandSettlement {
   handId: string;
+  /** Per-player net change to their table stack, AFTER rake is deducted. */
   deltas: Array<{ playerId: string; net: bigint }>;
+  /** Total rake taken from the pot. */
   rake: bigint;
+  /** Per-player gross contribution to the pot — basis for referral attribution. */
+  contributions: Array<{ playerId: string; amount: bigint }>;
 }
 
 /** Emitted when a hand is dealt, for persisting the Hand + RngProof rows. */
@@ -411,28 +416,74 @@ export class TableRoom {
       serverSeed: this.serverSeed ?? "",
     });
 
-    // Sync room stacks from engine result and compute per-player settlement
-    // deltas. The engine stack already reflects winnings, so the net change for
-    // the hand is (final engine stack − starting room stack). With no rake these
-    // deltas sum to zero across players (chip conservation), which is exactly
-    // what the balanced ledger transaction requires.
-    const deltas: HandSettlement["deltas"] = [];
-    for (const es of hand.seats) {
-      const roomSeat = this.findSeatByPlayer(es.playerId);
-      if (roomSeat) {
-        deltas.push({ playerId: es.playerId, net: es.stack - roomSeat.stack });
-        roomSeat.stack = es.stack;
-        // Bust-out: drop to sitting-out between hands.
-        if (roomSeat.stack === 0n) roomSeat.sittingOut = true;
+    // ---- Rake -------------------------------------------------------------
+    // Take the house fee out of the pot ("no flop, no drop"), apportioned across
+    // winners by what they collected so it comes out exactly once. Per-player
+    // gross contributions are recorded for downstream referral attribution.
+    const pot = hand.totalPot;
+    const flopSeen = (pub.community?.length ?? 0) >= 3;
+    const rake = computeRake({
+      pot,
+      rakeBps: this.config.rakeBps ?? 0,
+      bigBlind: this.config.bigBlind,
+      flopSeen,
+    });
+
+    const wonByPlayer = new Map<string, bigint>();
+    for (const r of pub.results ?? []) {
+      wonByPlayer.set(r.playerId, (wonByPlayer.get(r.playerId) ?? 0n) + r.amountWon);
+    }
+
+    const rakeByPlayer = new Map<string, bigint>();
+    if (rake > 0n && pot > 0n) {
+      let distributed = 0n;
+      let topPlayer: string | null = null;
+      let topWon = -1n;
+      for (const [playerId, won] of wonByPlayer) {
+        if (won <= 0n) continue;
+        const share = (rake * won) / pot;
+        rakeByPlayer.set(playerId, share);
+        distributed += share;
+        if (won > topWon) {
+          topWon = won;
+          topPlayer = playerId;
+        }
+      }
+      // The biggest winner absorbs the rounding remainder so the total taken
+      // equals `rake` exactly.
+      const remainder = rake - distributed;
+      if (remainder > 0n && topPlayer) {
+        rakeByPlayer.set(topPlayer, (rakeByPlayer.get(topPlayer) ?? 0n) + remainder);
       }
     }
 
-    // Engine MVP path takes no rake (settleHand called with no rakeBps), so the
-    // deltas net to zero. When rake is enabled, subtract it here.
+    // Sync room stacks (net of rake) and compute post-rake deltas + the gross
+    // pot contribution per player. contribution = start − end + winnings.
+    const deltas: HandSettlement["deltas"] = [];
+    const contributions: HandSettlement["contributions"] = [];
+    for (const es of hand.seats) {
+      const roomSeat = this.findSeatByPlayer(es.playerId);
+      if (!roomSeat) continue;
+      const startStack = roomSeat.stack;
+      const won = wonByPlayer.get(es.playerId) ?? 0n;
+      const contribution = startStack - es.stack + won;
+      if (contribution > 0n) {
+        contributions.push({ playerId: es.playerId, amount: contribution });
+      }
+
+      const rakeShare = rakeByPlayer.get(es.playerId) ?? 0n;
+      const finalStack = es.stack - rakeShare;
+      deltas.push({ playerId: es.playerId, net: finalStack - startStack });
+      roomSeat.stack = finalStack;
+      // Bust-out: drop to sitting-out between hands.
+      if (roomSeat.stack === 0n) roomSeat.sittingOut = true;
+    }
+
     void this.onHandSettled?.({
       handId: hand.handId,
       deltas,
-      rake: 0n,
+      rake,
+      contributions,
     });
 
     // Persist final Hand state, results, actions, and reveal the server seed.
@@ -441,7 +492,7 @@ export class TableRoom {
       handNumber: this.handNumber,
       serverSeed: this.serverSeed ?? "",
       potAmount: hand.totalPot,
-      rake: 0n,
+      rake,
       results: (pub.results ?? []).map((r) => ({
         seat: r.seat,
         playerId: r.playerId,

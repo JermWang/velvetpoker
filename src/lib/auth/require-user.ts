@@ -4,10 +4,12 @@
  */
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { isAdminEmail, isAdminWallet } from "@/lib/env";
 import { shortAddress } from "@/lib/utils";
+import { ensureReferralCode, attributeReferral } from "@/lib/referrals/referrals";
 import { getSessionIdentity } from "./session";
 
 /** Returns the current User (creating it on first login) or null. */
@@ -22,20 +24,37 @@ export async function getCurrentUser(): Promise<User | null> {
   const role = isAdmin ? "ADMIN" : undefined;
   const displayName = primaryWallet ? shortAddress(primaryWallet) : undefined;
 
-  const user = await prisma.user.upsert({
+  const existing = await prisma.user.findUnique({
     where: { privyUserId: identity.privyUserId },
-    create: {
-      privyUserId: identity.privyUserId,
-      email: identity.email,
-      displayName,
-      role: role ?? "USER",
-    },
-    update: {
-      ...(identity.email ? { email: identity.email } : {}),
-      ...(role ? { role } : {}),
-      ...(displayName ? { displayName } : {}),
-    },
   });
+
+  let user: User;
+  if (!existing) {
+    user = await prisma.user.create({
+      data: {
+        privyUserId: identity.privyUserId,
+        email: identity.email,
+        displayName,
+        role: role ?? "USER",
+      },
+    });
+    // First sign-in: assign a referral code, and attribute to a referrer if a
+    // `ref` code was captured into the cookie by middleware.
+    await ensureReferralCode(user.id);
+    const refCode = cookies().get("velvet_ref")?.value;
+    if (refCode) await attributeReferral(user.id, refCode);
+  } else {
+    user = await prisma.user.update({
+      where: { privyUserId: identity.privyUserId },
+      data: {
+        ...(identity.email ? { email: identity.email } : {}),
+        ...(role ? { role } : {}),
+        ...(displayName ? { displayName } : {}),
+      },
+    });
+    // Backfill a referral code for users created before referrals existed.
+    if (!user.referralCode) await ensureReferralCode(user.id);
+  }
 
   // Persist the linked Solana wallet(s) for cashier/withdrawal UX and audit.
   for (const address of identity.wallets) {

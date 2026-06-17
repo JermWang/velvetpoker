@@ -78,9 +78,11 @@ async function applyBalanceDelta(
 
   let available = balance.availableAmount;
   let locked = balance.lockedAmount;
+  let referralEarnings = balance.referralEarningsAmount;
 
   if (l.accountType === "USER_AVAILABLE") available += delta;
   else if (l.accountType === "USER_TABLE_LOCKED") locked += delta;
+  else if (l.accountType === "USER_REFERRAL_EARNINGS") referralEarnings += delta;
 
   if (available < 0n) {
     throw new LedgerError(
@@ -92,10 +94,19 @@ async function applyBalanceDelta(
       `Insufficient locked balance for user ${userId} (${asset})`,
     );
   }
+  if (referralEarnings < 0n) {
+    throw new LedgerError(
+      `Insufficient referral earnings for user ${userId} (${asset})`,
+    );
+  }
 
   await db.balance.update({
     where: { userId_asset: { userId, asset } },
-    data: { availableAmount: available, lockedAmount: locked },
+    data: {
+      availableAmount: available,
+      lockedAmount: locked,
+      referralEarningsAmount: referralEarnings,
+    },
   });
 }
 
@@ -189,9 +200,23 @@ export interface HandSettlementLeg {
 }
 
 /**
- * Settle a completed hand against table-locked balances. Winners' locked
- * balance rises, losers' falls, and any rake routes to PLATFORM_REVENUE. The
- * legs must net to zero across users + rake (enforced by assertBalanced).
+ * How a hand's rake is split. All amounts are base units and must sum to the
+ * total rake taken out of the pot. `referralPayouts` credit each referrer's
+ * claimable referral-earnings bucket; `team` + `buyback` go to system revenue
+ * accounts. Computed by the settlement layer (see realtime/persistence.ts).
+ */
+export interface RakeSplit {
+  team: bigint;
+  buyback: bigint;
+  referralPayouts: Array<{ referrerUserId: string; amount: bigint }>;
+}
+
+/**
+ * Settle a completed hand against table-locked balances. Winners' locked balance
+ * rises, losers' falls. Any rake taken out of the pot is split: the players'
+ * net deltas already reflect the rake deduction (they sum to -totalRake), and
+ * the rake is routed to TEAM_REVENUE, BUYBACK_RESERVE, and referrers' claimable
+ * earnings. The full set of legs must balance (enforced by assertBalanced).
  */
 export async function settleHandLedger(
   params: {
@@ -200,7 +225,7 @@ export async function settleHandLedger(
     handId: string;
     correlationId: string;
     deltas: HandSettlementLeg[];
-    rake?: bigint;
+    rakeSplit?: RakeSplit;
   },
   tx?: Tx,
 ): Promise<void> {
@@ -215,8 +240,16 @@ export async function settleHandLedger(
       ),
     );
   }
-  if (params.rake && params.rake > 0n) {
-    legs.push(leg.system("PLATFORM_REVENUE", "CREDIT", params.rake));
+
+  const split = params.rakeSplit;
+  if (split) {
+    if (split.team > 0n) legs.push(leg.system("TEAM_REVENUE", "CREDIT", split.team));
+    if (split.buyback > 0n)
+      legs.push(leg.system("BUYBACK_RESERVE", "CREDIT", split.buyback));
+    for (const p of split.referralPayouts) {
+      if (p.amount > 0n)
+        legs.push(leg.userReferralEarnings(p.referrerUserId, "CREDIT", p.amount));
+    }
   }
   if (legs.length === 0) return;
 
@@ -231,6 +264,39 @@ export async function settleHandLedger(
     },
     tx,
   );
+}
+
+/**
+ * Claim accrued referral earnings into the user's available balance (which can
+ * then be withdrawn). Moves the full claimable amount and returns it.
+ */
+export async function claimReferralEarnings(
+  params: { userId: string; asset: Asset; correlationId: string },
+  tx?: Tx,
+): Promise<bigint> {
+  const run = async (db: Tx): Promise<bigint> => {
+    const balance = await db.balance.findUnique({
+      where: { userId_asset: { userId: params.userId, asset: params.asset } },
+    });
+    const amount = balance?.referralEarningsAmount ?? 0n;
+    if (amount <= 0n) return 0n;
+
+    await postLedgerTransaction(
+      {
+        asset: params.asset,
+        reason: "REFERRAL_CLAIMED",
+        correlationId: params.correlationId,
+        legs: [
+          leg.userReferralEarnings(params.userId, "DEBIT", amount),
+          leg.userAvailable(params.userId, "CREDIT", amount),
+        ],
+      },
+      db,
+    );
+    return amount;
+  };
+
+  return tx ? run(tx) : prisma.$transaction(run);
 }
 
 /** Withdrawal requested: user available -> withdrawal pending (locked out). */
@@ -348,7 +414,15 @@ export async function adminAdjust(
 export async function reconcileUserBalance(
   userId: string,
   asset: Asset,
-): Promise<{ ok: boolean; cachedAvailable: bigint; ledgerAvailable: bigint; cachedLocked: bigint; ledgerLocked: bigint }> {
+): Promise<{
+  ok: boolean;
+  cachedAvailable: bigint;
+  ledgerAvailable: bigint;
+  cachedLocked: bigint;
+  ledgerLocked: bigint;
+  cachedReferral: bigint;
+  ledgerReferral: bigint;
+}> {
   const [balance, entries] = await Promise.all([
     prisma.balance.findUnique({ where: { userId_asset: { userId, asset } } }),
     prisma.ledgerEntry.findMany({ where: { userId, asset } }),
@@ -356,20 +430,28 @@ export async function reconcileUserBalance(
 
   let available = 0n;
   let locked = 0n;
+  let referral = 0n;
   for (const e of entries) {
     const sign = e.direction === "CREDIT" ? 1n : -1n;
     if (e.accountType === "USER_AVAILABLE") available += sign * e.amount;
     else if (e.accountType === "USER_TABLE_LOCKED") locked += sign * e.amount;
+    else if (e.accountType === "USER_REFERRAL_EARNINGS") referral += sign * e.amount;
   }
 
   const cachedAvailable = balance?.availableAmount ?? 0n;
   const cachedLocked = balance?.lockedAmount ?? 0n;
+  const cachedReferral = balance?.referralEarningsAmount ?? 0n;
   return {
-    ok: cachedAvailable === available && cachedLocked === locked,
+    ok:
+      cachedAvailable === available &&
+      cachedLocked === locked &&
+      cachedReferral === referral,
     cachedAvailable,
     ledgerAvailable: available,
     cachedLocked,
     ledgerLocked: locked,
+    cachedReferral,
+    ledgerReferral: referral,
   };
 }
 

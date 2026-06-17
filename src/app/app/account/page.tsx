@@ -2,11 +2,14 @@ import { requireUser } from "@/lib/auth/require-user";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
 import { AccountActions } from "@/components/account/account-actions";
+import { ReferralPanel } from "@/components/account/referral-panel";
+import { getReferralSummary } from "@/lib/referrals/referrals";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
   const user = await requireUser();
+  const referral = await getReferralSummary(user.id);
 
   const rows: Array<[string, string]> = [
     ["Account status", user.status],
@@ -41,6 +44,19 @@ export default async function AccountPage() {
               </div>
             ))}
           </dl>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Refer &amp; earn</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ReferralPanel
+            code={referral.code}
+            refereeCount={referral.refereeCount}
+            balances={referral.balances}
+          />
         </CardContent>
       </Card>
 

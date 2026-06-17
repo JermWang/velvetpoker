@@ -34,6 +34,7 @@ export interface LedgerTransactionInput {
 const USER_BALANCE_ACCOUNTS: LedgerAccountType[] = [
   "USER_AVAILABLE",
   "USER_TABLE_LOCKED",
+  "USER_REFERRAL_EARNINGS",
 ];
 
 export function isUserBalanceAccount(a: LedgerAccountType): boolean {
@@ -84,6 +85,13 @@ export const leg = {
     amount: bigint,
   ): LedgerLeg {
     return { userId, accountType: "USER_TABLE_LOCKED", direction, amount };
+  },
+  userReferralEarnings(
+    userId: string,
+    direction: LedgerDirection,
+    amount: bigint,
+  ): LedgerLeg {
+    return { userId, accountType: "USER_REFERRAL_EARNINGS", direction, amount };
   },
   system(
     accountType: LedgerAccountType,

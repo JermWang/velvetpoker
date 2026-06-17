@@ -68,8 +68,14 @@ enum LedgerDirection {
 enum LedgerAccountType {
   USER_AVAILABLE
   USER_TABLE_LOCKED
+  // Claimable referral earnings, a third per-user balance bucket (not yet
+  // withdrawable until claimed into USER_AVAILABLE).
+  USER_REFERRAL_EARNINGS
   TABLE_POT
   PLATFORM_REVENUE
+  // The three rake destinations (house fee split equally three ways).
+  TEAM_REVENUE
+  BUYBACK_RESERVE
   WITHDRAWAL_PENDING
   TREASURY_CASH
   ADJUSTMENT
@@ -87,6 +93,8 @@ enum LedgerReason {
   WITHDRAWAL_REJECTED
   ADMIN_ADJUSTMENT
   RAKE_TAKEN
+  REFERRAL_EARNED
+  REFERRAL_CLAIMED
 }
 
 enum DepositStatus {
@@ -197,6 +205,12 @@ model User {
   depositLimitDaily   BigInt?
   selfExcludedUntil   DateTime?
 
+  // Referrals: each user has a unique share code; referredById is the user who
+  // referred them (set once, at first sign-in, never changed).
+  referralCode String?   @unique
+  referredById String?
+  referredAt   DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -212,8 +226,12 @@ model User {
   riskEvents   RiskEvent[]
   auditLogs    AuditLog[]    @relation("ActorAudit")
 
+  referredBy User?  @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals  User[] @relation("Referrals")
+
   @@index([status])
   @@index([kycStatus])
+  @@index([referredById])
 }
 
 model Wallet {
@@ -237,6 +255,8 @@ model Balance {
   asset           Asset
   availableAmount BigInt   @default(0)
   lockedAmount    BigInt   @default(0)
+  // Claimable referral earnings (moves to availableAmount on claim).
+  referralEarningsAmount BigInt @default(0)
   updatedAt       DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -25,7 +25,9 @@
     "job:reconcile": "tsx --env-file=.env src/lib/jobs/reconciliation.ts",
     "worker": "tsx --env-file=.env src/lib/jobs/worker.ts",
     "worker:prod": "tsx src/lib/jobs/worker.ts",
-    "verify:flow": "tsx --env-file=.env scripts/verify-flow.ts"
+    "verify:flow": "tsx --env-file=.env scripts/verify-flow.ts",
+    "seed:rooms": "tsx --env-file=.env scripts/seed-house-rooms.ts",
+    "verify:rake": "tsx --env-file=.env scripts/verify-rake-referral.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
