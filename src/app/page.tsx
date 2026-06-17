@@ -5,9 +5,30 @@ import { CardFan } from "@/components/marketing/card-fan";
 
 export default function StartScreen() {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-between px-6 py-8">
+    <div className="relative isolate flex min-h-screen flex-col items-center justify-between px-6 py-8">
+      {/* Landing bloom — a soft warm glow that lifts the centerpiece a touch
+          brighter than the global ambient. Landing-only, sits behind content. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        <div
+          className="absolute left-1/2 top-[42%] h-[88vh] w-[88vh] max-w-[1040px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{
+            background:
+              "radial-gradient(closest-side, rgba(200,169,106,0.20), rgba(200,169,106,0.07) 46%, transparent 72%)",
+            filter: "blur(40px)",
+          }}
+        />
+        <div
+          className="absolute left-1/2 top-[40%] h-[44vh] w-[44vh] max-w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{
+            background:
+              "radial-gradient(closest-side, rgba(244,221,224,0.12), transparent 70%)",
+            filter: "blur(26px)",
+          }}
+        />
+      </div>
+
       {/* Brand mark */}
-      <header className="flex w-full max-w-6xl items-center justify-center pt-2 animate-fade-up">
+      <header className="relative z-10 flex w-full max-w-6xl items-center justify-center pt-2 animate-fade-up">
         <Image
           src="/velvet-poker-chip.png"
           alt="Velvet Poker"
@@ -19,7 +40,7 @@ export default function StartScreen() {
       </header>
 
       {/* Centerpiece */}
-      <main className="flex flex-1 flex-col items-center justify-center text-center">
+      <main className="relative z-10 flex flex-1 flex-col items-center justify-center text-center">
         <div className="animate-fade-up">
           <CardFan />
         </div>
@@ -74,7 +95,7 @@ export default function StartScreen() {
       </main>
 
       {/* Slim compliance footer */}
-      <footer className="flex w-full max-w-6xl flex-col items-center gap-2 pb-1 text-center">
+      <footer className="relative z-10 flex w-full max-w-6xl flex-col items-center gap-2 pb-1 text-center">
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-ash/70">
           <Link href="/legal/rules" className="hover:text-ivory">Game rules</Link>
           <Link href="/legal/responsible-gaming" className="hover:text-ivory">Responsible play</Link>
