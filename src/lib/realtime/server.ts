@@ -89,10 +89,25 @@ async function resolveIdentity(
   return null;
 }
 
+// In-flight room creations, so two clients joining the same table at the same
+// time share ONE room instead of racing to create two (which would split the
+// players across rooms and the hand would never start).
+const roomCreation = new Map<string, Promise<RoomEntry | null>>();
+
 async function getOrCreateRoom(tableId: string): Promise<RoomEntry | null> {
   const existing = rooms.get(tableId);
   if (existing) return existing;
 
+  let pending = roomCreation.get(tableId);
+  if (!pending) {
+    pending = createRoom(tableId);
+    roomCreation.set(tableId, pending);
+    void pending.finally(() => roomCreation.delete(tableId));
+  }
+  return pending;
+}
+
+async function createRoom(tableId: string): Promise<RoomEntry | null> {
   const table = await prisma.pokerTable.findUnique({ where: { id: tableId } });
   if (!table) return null;
 
@@ -197,6 +212,12 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
         where: { id: event.tableId },
       });
       if (!table) break;
+
+      // One seat per player. Reject a second buy-in BEFORE locking any funds.
+      if (room.hasPlayer(userId)) {
+        sendTo(client, { t: "ERROR", message: "You're already seated at this table" });
+        break;
+      }
 
       // Demo tables seat with free chips and never touch the ledger; the stack
       // is clamped to the table's configured buy-in range.
@@ -331,10 +352,11 @@ export function startServer(
     //  - read-only spectator (?spectate=1)
     const wantsSpectate = url.searchParams.get("spectate") === "1";
     const guestParam = url.searchParams.get("guest");
+    // Use the client-supplied guest id verbatim as the player id so it matches
+    // the client's own `youUserId` (seat/hole-card matching). Guest privileges
+    // are enforced by the isGuest flag, not the id format.
     const guestId =
-      guestParam && /^[A-Za-z0-9_-]{1,40}$/.test(guestParam)
-        ? `guest:${guestParam}`
-        : null;
+      guestParam && /^[A-Za-z0-9_-]{1,40}$/.test(guestParam) ? guestParam : null;
 
     if (!identity && !guestId && !wantsSpectate) {
       ws.send(encode({ t: "ERROR", message: "Unauthorized", code: "AUTH" }));
@@ -379,7 +401,17 @@ export function startServer(
       if (client.tableId) {
         const entry = rooms.get(client.tableId);
         if (entry) {
-          if (client.userId) entry.room.setConnected(client.userId, false);
+          if (client.userId) {
+            // Free-play seats are ephemeral (guests use a fresh id each visit),
+            // so vacate them on disconnect — otherwise dead seats pile up and
+            // fill the table. Real-money seats stay (marked offline) so the
+            // player can reconnect; their funds remain locked until they leave.
+            if (client.isGuest || entry.isDemo) {
+              entry.room.leave(client.userId);
+            } else {
+              entry.room.setConnected(client.userId, false);
+            }
+          }
           entry.clients.delete(client);
         }
       }

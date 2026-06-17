@@ -130,12 +130,22 @@ export class TableRoom {
 
   // ---- seating -----------------------------------------------------------
 
+  /** Whether this player already occupies a seat at the table. */
+  hasPlayer(playerId: string): boolean {
+    return !!this.findSeatByPlayer(playerId);
+  }
+
   sit(params: {
     playerId: string;
     displayName: string;
     seatNumber: number;
     stack: bigint;
   }): void {
+    // A player may hold only one seat — never multiple.
+    if (this.findSeatByPlayer(params.playerId)) {
+      this.send(params.playerId, { t: "ERROR", message: "You're already seated" });
+      return;
+    }
     if (this.seats.has(params.seatNumber)) {
       this.send(params.playerId, { t: "ERROR", message: "Seat taken" });
       return;
