@@ -125,7 +125,7 @@ export function CardFan() {
   return (
     <div
       ref={containerRef}
-      className="relative mx-auto flex h-[260px] w-[34rem] max-w-[92vw] items-center justify-center"
+      className="relative mx-auto flex h-[260px] w-[34rem] max-w-[92vw] origin-center scale-[0.78] items-center justify-center sm:scale-100"
     >
       <div className="relative" style={{ animation: "vp-float 7s ease-in-out infinite" }}>
         {ROYAL_FLUSH.map((card, i) => (

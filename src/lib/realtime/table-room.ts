@@ -135,6 +135,19 @@ export class TableRoom {
     return !!this.findSeatByPlayer(playerId);
   }
 
+  /**
+   * Whether this player is dealt into the current, in-progress hand. Used to
+   * block a mid-hand cash-out — their committed chips are live in the pot, and
+   * the between-hands room stack isn't yet synced to the engine's live stack.
+   */
+  isInActiveHand(playerId: string): boolean {
+    return (
+      !!this.hand &&
+      !this.hand.isComplete &&
+      this.hand.seats.some((s) => s.playerId === playerId)
+    );
+  }
+
   sit(params: {
     playerId: string;
     displayName: string;

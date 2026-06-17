@@ -37,7 +37,13 @@ export function PokerTableView(props: PokerTableViewProps) {
       ? `g${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`
       : null,
   );
-  const youUserId = props.guestMode ? guestId : props.youUserId;
+  // The server namespaces guest ids as `guest:<id>`; match that for seat/
+  // hole-card identification. The query param carries the raw id.
+  const youUserId = props.guestMode
+    ? guestId
+      ? `guest:${guestId}`
+      : null
+    : props.youUserId;
   const authQuery =
     props.guestMode && guestId ? `guest=${guestId}` : props.authQuery;
 

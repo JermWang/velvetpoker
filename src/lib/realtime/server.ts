@@ -75,7 +75,11 @@ async function resolveIdentity(
     });
     if (user) return { userId: user.id, displayName: user.displayName ?? "Player" };
   }
-  if (!env.isProduction) {
+  // Dev-only impersonation fallback. Hard-gated to environments where Privy is
+  // NOT configured (true local dev) so it can never be reached in production,
+  // regardless of whether NODE_ENV is set on the host.
+  const privyConfigured = Boolean(env.privyAppId && env.privyAppSecret);
+  if (!env.isProduction && !privyConfigured) {
     const devEmail = url.searchParams.get("dev");
     if (devEmail) {
       const user = await prisma.user.findUnique({
@@ -284,6 +288,16 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
       room.submitClientSeed(userId, event.seed);
       break;
     case "LEAVE_TABLE": {
+      // You can't pick chips up out of a live pot. Make the player finish the
+      // current hand before leaving — this also prevents a cash-out of the
+      // stale pre-hand stack (which would create chips).
+      if (room.isInActiveHand(userId)) {
+        sendTo(client, {
+          t: "ERROR",
+          message: "You can leave once the current hand finishes",
+        });
+        break;
+      }
       const returned = room.leave(userId);
       // Demo chips are free — nothing to settle back to the ledger.
       if (!entry.isDemo && returned > 0n) {
@@ -352,11 +366,14 @@ export function startServer(
     //  - read-only spectator (?spectate=1)
     const wantsSpectate = url.searchParams.get("spectate") === "1";
     const guestParam = url.searchParams.get("guest");
-    // Use the client-supplied guest id verbatim as the player id so it matches
-    // the client's own `youUserId` (seat/hole-card matching). Guest privileges
-    // are enforced by the isGuest flag, not the id format.
+    // Namespace guest ids with a "guest:" prefix so a guest can never present an
+    // id equal to a real user's (which would let them receive that user's
+    // hole cards at a demo table). The client uses the same prefixed form as its
+    // `youUserId`. Guest privileges are enforced by the isGuest flag.
     const guestId =
-      guestParam && /^[A-Za-z0-9_-]{1,40}$/.test(guestParam) ? guestParam : null;
+      guestParam && /^[A-Za-z0-9_-]{1,40}$/.test(guestParam)
+        ? `guest:${guestParam}`
+        : null;
 
     if (!identity && !guestId && !wantsSpectate) {
       ws.send(encode({ t: "ERROR", message: "Unauthorized", code: "AUTH" }));
