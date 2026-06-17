@@ -29,13 +29,10 @@ export default function PrivyTree({
             theme: "dark",
             accentColor: "#8f1d2c",
             walletChainType: "solana-only",
-            walletList: [
-              "detected_solana_wallets",
-              "phantom",
-              "solflare",
-              "backpack",
-              "jupiter",
-            ],
+            // Curated, Phantom-first list of the dominant Solana wallets. We do
+            // NOT include "detected_solana_wallets" on purpose — that auto-surfaces
+            // every installed wallet (Magic Eden, Leap, etc.), which we don't want.
+            walletList: ["phantom", "solflare", "backpack"],
           },
           externalWallets: {
             solana: {

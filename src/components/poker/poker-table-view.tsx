@@ -11,6 +11,7 @@ import { ActionBar } from "./action-bar";
 import { BuyInPanel } from "./buy-in-panel";
 import { VerifyHandDrawer } from "./verify-hand-drawer";
 import { Button } from "@/components/ui/button";
+import { ConnectButton } from "@/components/auth/connect-button";
 
 export interface PokerTableViewProps {
   tableId: string;
@@ -20,7 +21,8 @@ export interface PokerTableViewProps {
   maxBuyIn: string;
   wsUrl: string;
   authQuery: string;
-  youUserId: string;
+  /** Null when the viewer is an unauthenticated spectator. */
+  youUserId: string | null;
 }
 
 export function PokerTableView(props: PokerTableViewProps) {
@@ -31,9 +33,13 @@ export function PokerTableView(props: PokerTableViewProps) {
   });
   const [chatInput, setChatInput] = useState("");
 
+  const isSpectator = props.youUserId == null;
   const table = state.table;
   const yourSeat = useMemo(
-    () => table?.seats.find((s) => s.playerId === props.youUserId) ?? null,
+    () =>
+      props.youUserId == null
+        ? null
+        : (table?.seats.find((s) => s.playerId === props.youUserId) ?? null),
     [table, props.youUserId],
   );
   const seated = !!yourSeat;
@@ -75,6 +81,11 @@ export function PokerTableView(props: PokerTableViewProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {isSpectator && (
+            <span className="rounded-full border border-gold/30 bg-gold/5 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-gold/90">
+              Spectating
+            </span>
+          )}
           <span
             className={`h-2 w-2 rounded-full ${
               state.connected ? "bg-emerald-400" : "bg-amber-400 animate-pulse-soft"
@@ -163,7 +174,14 @@ export function PokerTableView(props: PokerTableViewProps) {
       )}
 
       {/* Action / buy-in */}
-      {!seated ? (
+      {isSpectator ? (
+        <div className="card-surface flex flex-col items-center gap-3 p-6 text-center">
+          <p className="text-sm text-ash">
+            You&apos;re spectating. Connect your wallet to take a seat and play.
+          </p>
+          <ConnectButton label="Connect wallet to take a seat" />
+        </div>
+      ) : !seated ? (
         <BuyInPanel
           asset={props.asset}
           minBuyIn={BigInt(props.minBuyIn)}
@@ -205,25 +223,31 @@ export function PokerTableView(props: PokerTableViewProps) {
             ))
           )}
         </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!chatInput.trim()) return;
-            send({ t: "SEND_CHAT", tableId: props.tableId, message: chatInput });
-            setChatInput("");
-          }}
-          className="flex gap-2"
-        >
-          <input
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            placeholder="Say something…"
-            className="h-9 flex-1 rounded-lg border border-white/10 bg-charcoal-900/60 px-3 text-sm text-ivory placeholder:text-ash/50 focus:outline-none"
-          />
-          <Button size="sm" variant="secondary" type="submit">
-            Send
-          </Button>
-        </form>
+        {isSpectator ? (
+          <p className="text-xs text-ash/60">
+            Connect your wallet to join the conversation.
+          </p>
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!chatInput.trim()) return;
+              send({ t: "SEND_CHAT", tableId: props.tableId, message: chatInput });
+              setChatInput("");
+            }}
+            className="flex gap-2"
+          >
+            <input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Say something…"
+              className="h-9 flex-1 rounded-lg border border-white/10 bg-charcoal-900/60 px-3 text-sm text-ivory placeholder:text-ash/50 focus:outline-none"
+            />
+            <Button size="sm" variant="secondary" type="submit">
+              Send
+            </Button>
+          </form>
+        )}
       </div>
     </div>
   );

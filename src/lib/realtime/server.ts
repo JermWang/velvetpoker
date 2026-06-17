@@ -23,9 +23,11 @@ import { startBackgroundWorkers } from "@/lib/jobs/worker";
 
 interface Client {
   ws: WebSocket;
-  userId: string;
+  /** Null for unauthenticated spectators (read-only viewers). */
+  userId: string | null;
   displayName: string;
   tableId: string | null;
+  isSpectator: boolean;
 }
 
 interface RoomEntry {
@@ -128,16 +130,52 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
   if (!entry) return sendTo(client, { t: "ERROR", message: "Table not found" });
   const { room } = entry;
 
+  // Spectators are read-only: they receive public broadcasts (felt, bets, pot,
+  // showdown) but can never sit, act, or chat, and never receive hole cards
+  // (those are delivered by playerId, which a null-userId spectator can't match).
+  if (client.isSpectator) {
+    switch (event.t) {
+      case "JOIN_TABLE": {
+        const table = await prisma.pokerTable.findUnique({
+          where: { id: event.tableId },
+        });
+        if (!table?.spectatorsAllowed) {
+          return sendTo(client, {
+            t: "ERROR",
+            message: "Spectating is not allowed at this table",
+          });
+        }
+        client.tableId = event.tableId;
+        entry.clients.add(client);
+        sendTo(client, { t: "TABLE_STATE", state: room.buildTableState() });
+        break;
+      }
+      case "REQUEST_TABLE_STATE":
+        sendTo(client, { t: "TABLE_STATE", state: room.buildTableState() });
+        break;
+      default:
+        sendTo(client, {
+          t: "ERROR",
+          message: "Connect a wallet to take a seat or chat",
+        });
+    }
+    return;
+  }
+
+  // Authenticated player from here on (spectators returned above).
+  const userId = client.userId;
+  if (userId == null) return;
+
   switch (event.t) {
     case "JOIN_TABLE": {
       client.tableId = event.tableId;
       entry.clients.add(client);
-      room.setConnected(client.userId, true);
-      room.sendTableState(client.userId);
+      room.setConnected(userId, true);
+      room.sendTableState(userId);
       break;
     }
     case "REQUEST_TABLE_STATE":
-      room.sendTableState(client.userId);
+      room.sendTableState(userId);
       break;
     case "BUY_IN": {
       const amount = BigInt(event.amount);
@@ -148,11 +186,11 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
       try {
         // Lock funds available -> table-locked before seating.
         await lockBuyIn({
-          userId: client.userId,
+          userId,
           asset: table.asset,
           amount,
           tableId: table.id,
-          correlationId: `buyin:${client.userId}:${Date.now()}`,
+          correlationId: `buyin:${userId}:${Date.now()}`,
         });
       } catch (err) {
         sendTo(client, {
@@ -167,7 +205,7 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
         break;
       }
       room.sit({
-        playerId: client.userId,
+        playerId: userId,
         displayName: client.displayName,
         seatNumber,
         stack: amount,
@@ -176,28 +214,28 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
     }
     case "PLAYER_ACTION": {
       const amount = event.amount ? BigInt(event.amount) : undefined;
-      room.handleAction(client.userId, event.action, amount);
+      room.handleAction(userId, event.action, amount);
       break;
     }
     case "SIT_OUT":
-      room.setSitOut(client.userId, event.sitOut);
+      room.setSitOut(userId, event.sitOut);
       break;
     case "SUBMIT_CLIENT_SEED":
-      room.submitClientSeed(client.userId, event.seed);
+      room.submitClientSeed(userId, event.seed);
       break;
     case "LEAVE_TABLE": {
-      const returned = room.leave(client.userId);
+      const returned = room.leave(userId);
       const table = await prisma.pokerTable.findUnique({
         where: { id: event.tableId },
       });
       if (table && returned > 0n) {
         try {
           await cashOutSeat({
-            userId: client.userId,
+            userId,
             asset: table.asset,
             amount: returned,
             tableId: table.id,
-            correlationId: `cashout:${client.userId}:${Date.now()}`,
+            correlationId: `cashout:${userId}:${Date.now()}`,
           });
         } catch (err) {
           console.error("[ws] cashOutSeat failed", err);
@@ -245,17 +283,29 @@ export function startServer(
   wss.on("connection", async (ws, req) => {
     const url = new URL(req.url ?? "/", `http://localhost:${port}`);
     const identity = await resolveIdentity(url, req.headers.cookie);
-    if (!identity) {
+    // Unauthenticated viewers may connect as read-only spectators (?spectate=1);
+    // everything else requires a valid identity.
+    const wantsSpectate = url.searchParams.get("spectate") === "1";
+    if (!identity && !wantsSpectate) {
       ws.send(encode({ t: "ERROR", message: "Unauthorized", code: "AUTH" }));
       ws.close();
       return;
     }
-    const client: Client = {
-      ws,
-      userId: identity.userId,
-      displayName: identity.displayName,
-      tableId: null,
-    };
+    const client: Client = identity
+      ? {
+          ws,
+          userId: identity.userId,
+          displayName: identity.displayName,
+          tableId: null,
+          isSpectator: false,
+        }
+      : {
+          ws,
+          userId: null,
+          displayName: "Spectator",
+          tableId: null,
+          isSpectator: true,
+        };
 
     ws.on("message", (data) => {
       void handleEvent(client, data.toString());
@@ -264,7 +314,7 @@ export function startServer(
       if (client.tableId) {
         const entry = rooms.get(client.tableId);
         if (entry) {
-          entry.room.setConnected(client.userId, false);
+          if (client.userId) entry.room.setConnected(client.userId, false);
           entry.clients.delete(client);
         }
       }

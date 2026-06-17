@@ -1,10 +1,12 @@
-import { requireUser } from "@/lib/auth/require-user";
+import { getCurrentUser } from "@/lib/auth/require-user";
 import { HostTableForm } from "@/components/host/host-table-form";
 
 export const dynamic = "force-dynamic";
 
+// Public — anyone can explore how a table is configured; connection is only
+// required to actually create it (gated on the form's submit).
 export default async function HostPage() {
-  await requireUser();
+  const user = await getCurrentUser();
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <div>
@@ -15,7 +17,7 @@ export default async function HostPage() {
           are reachable by invite link or code.
         </p>
       </div>
-      <HostTableForm />
+      <HostTableForm authed={Boolean(user)} />
     </div>
   );
 }

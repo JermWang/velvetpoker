@@ -32,7 +32,7 @@ export default function WalletSignInInner() {
         {!ready ? "Loading…" : authenticated ? "Entering…" : "Connect Solana wallet"}
       </Button>
       <p className="text-center text-xs text-ash/70">
-        Phantom, Solflare, Backpack, Jupiter and other Solana wallets supported.
+        Phantom, Solflare, and Backpack supported.
       </p>
     </div>
   );

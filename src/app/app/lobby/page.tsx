@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth/require-user";
 import { prisma } from "@/lib/db/prisma";
 import { TableCard, type TableCardData } from "@/components/lobby/table-card";
 import { JoinPrivate } from "@/components/lobby/join-private";
@@ -7,9 +6,8 @@ import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
+// Public — no wallet required to browse the lobby or open a table to spectate.
 export default async function LobbyPage() {
-  await requireUser();
-
   const tables = await prisma.pokerTable.findMany({
     where: { visibility: "PUBLIC", status: { in: ["WAITING", "ACTIVE"] } },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],

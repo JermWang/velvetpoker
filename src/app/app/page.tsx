@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth/require-user";
+import { getCurrentUser } from "@/lib/auth/require-user";
 import { prisma } from "@/lib/db/prisma";
 import { evaluateRealMoneyGates } from "@/lib/compliance/gates";
 import { ComplianceGateCard } from "@/components/app-shell/compliance-gate-card";
@@ -7,11 +7,11 @@ import { ComplianceGateCard } from "@/components/app-shell/compliance-gate-card"
 export const dynamic = "force-dynamic";
 
 export default async function AppHome() {
-  const user = await requireUser();
+  const user = await getCurrentUser();
   const [openTables] = await Promise.all([
     prisma.pokerTable.count({ where: { status: { in: ["WAITING", "ACTIVE"] } } }),
   ]);
-  const cleared = evaluateRealMoneyGates(user).allowed;
+  const cleared = user ? evaluateRealMoneyGates(user).allowed : false;
 
   return (
     <div className="mx-auto max-w-4xl space-y-8 py-4">
@@ -22,7 +22,7 @@ export default async function AppHome() {
         </h1>
       </div>
 
-      {!cleared && <ComplianceGateCard user={user} />}
+      {user && !cleared && <ComplianceGateCard user={user} />}
 
       {/* Primary: private tables — the house specialty. */}
       <Link href="/app/host" className="block">

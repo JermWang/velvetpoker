@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConnectButton } from "@/components/auth/connect-button";
 
-export function HostTableForm() {
+export function HostTableForm({ authed }: { authed: boolean }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -148,9 +149,19 @@ export function HostTableForm() {
 
           {error && <p className="text-sm text-red-300">{error}</p>}
 
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "Creating…" : "Create table"}
-          </Button>
+          {authed ? (
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Creating…" : "Create table"}
+            </Button>
+          ) : (
+            <div className="space-y-2">
+              <ConnectButton label="Connect wallet to host" />
+              <p className="text-xs text-ash/70">
+                Set everything up first — you only need to connect to create the
+                table.
+              </p>
+            </div>
+          )}
         </form>
       </CardContent>
     </Card>
