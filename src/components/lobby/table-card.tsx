@@ -38,7 +38,7 @@ export function TableCard({ table }: { table: TableCardData }) {
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5">
-            <span className="rounded-full border border-gold/30 bg-gold/10 px-2.5 py-0.5 text-xs font-medium text-gold">
+            <span className="rounded-full border border-velvet/30 bg-velvet/10 px-2.5 py-0.5 text-xs font-medium text-velvet">
               {table.isDemo ? "FREE" : table.asset}
             </span>
             <span className="flex items-center gap-1 text-[11px] text-ash">
@@ -70,7 +70,7 @@ export function TableCard({ table }: { table: TableCardData }) {
                 key={i}
                 className={`grid h-5 w-5 place-items-center rounded-full text-[10px] ${
                   filled
-                    ? "border border-gold/40 bg-gold/15 text-gold"
+                    ? "border border-velvet/40 bg-velvet/15 text-velvet"
                     : "border border-white/10 text-ash/40"
                 }`}
               >
@@ -82,7 +82,7 @@ export function TableCard({ table }: { table: TableCardData }) {
 
         <div className="relative mt-5 flex items-center justify-between">
           {table.isDemo ? (
-            <span className="text-xs text-gold/80">Free play · no deposit</span>
+            <span className="text-xs text-velvet/80">Free play · no deposit</span>
           ) : table.visibility === "PRIVATE" ? (
             <span className="text-xs text-ash">Private · invite only</span>
           ) : (

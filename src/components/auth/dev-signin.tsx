@@ -32,7 +32,7 @@ export function DevSignIn() {
 
   return (
     <form onSubmit={submit} className="mt-6 space-y-4">
-      <div className="rounded-lg border border-gold/20 bg-gold/5 px-3 py-2 text-xs text-gold/90">
+      <div className="rounded-lg border border-velvet/20 bg-velvet/5 px-3 py-2 text-xs text-velvet/90">
         Development sign-in. Production uses Privy email/social login with an
         embedded Solana wallet.
       </div>

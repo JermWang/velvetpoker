@@ -26,8 +26,8 @@ export default async function AppHome() {
 
       {/* Primary: private tables — the house specialty. */}
       <Link href="/app/host" className="block">
-        <div className="glass glass-gold glass-hover relative overflow-hidden p-8">
-          <div className="absolute -right-10 -top-10 h-44 w-44 rounded-full bg-gold/10 blur-3xl" />
+        <div className="glass glass-velvet glass-hover relative overflow-hidden p-8">
+          <div className="absolute -right-10 -top-10 h-44 w-44 rounded-full bg-velvet/10 blur-3xl" />
           <p className="text-eyebrow">The house specialty</p>
           <h2 className="mt-2 font-display text-3xl text-ivory">
             Host a private table
@@ -36,7 +36,7 @@ export default async function AppHome() {
             Your stakes, your seats, invite-only. Spin up an elegant cash game in
             seconds and share a single link with your circle.
           </p>
-          <span className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-gold">
+          <span className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-velvet">
             Open the host room
             <span aria-hidden>→</span>
           </span>
@@ -63,9 +63,9 @@ export default async function AppHome() {
 
       <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-ash">
         <Link href="/app/history" className="hover:text-ivory">Hand &amp; ledger history</Link>
-        <span className="text-gold/30">◆</span>
+        <span className="text-velvet/30">◆</span>
         <Link href="/app/account" className="hover:text-ivory">Account &amp; limits</Link>
-        <span className="text-gold/30">◆</span>
+        <span className="text-velvet/30">◆</span>
         <Link href="/app/support" className="hover:text-ivory">Support</Link>
       </div>
     </div>
@@ -91,7 +91,7 @@ function EntranceCard({
         <p className="text-eyebrow">{eyebrow}</p>
         <h3 className="mt-1.5 font-display text-2xl text-ivory">{title}</h3>
         <p className="mt-2 flex-1 text-sm leading-relaxed text-ash">{body}</p>
-        <span className="mt-4 font-mono text-xs text-gold/80">{meta}</span>
+        <span className="mt-4 font-mono text-xs text-velvet/80">{meta}</span>
       </div>
     </Link>
   );

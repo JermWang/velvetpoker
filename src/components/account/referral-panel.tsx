@@ -67,7 +67,7 @@ export function ReferralPanel({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-gold/20 bg-gold/[0.03] p-4">
+      <div className="rounded-xl border border-velvet/20 bg-velvet/[0.03] p-4">
         <p className="text-sm leading-relaxed text-ash">
           Share your link. Anyone who connects through it is linked to you for
           good. You earn <span className="text-ivory">1% of every raked pot</span>{" "}

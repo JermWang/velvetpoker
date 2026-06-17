@@ -82,7 +82,7 @@ export function PokerTableView(props: PokerTableViewProps) {
   return (
     <div className="space-y-6">
       {props.demo && (
-        <div className="rounded-xl border border-gold/25 bg-gold/[0.04] px-4 py-2.5 text-center text-sm text-gold/90">
+        <div className="rounded-xl border border-velvet/25 bg-velvet/[0.04] px-4 py-2.5 text-center text-sm text-velvet/90">
           Free play — demo chips, no wallet or deposit needed. Nothing here is
           real money.
         </div>
@@ -103,7 +103,7 @@ export function PokerTableView(props: PokerTableViewProps) {
         </div>
         <div className="flex items-center gap-2">
           {isSpectator && (
-            <span className="rounded-full border border-gold/30 bg-gold/5 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-gold/90">
+            <span className="rounded-full border border-velvet/30 bg-velvet/5 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-velvet/90">
               Spectating
             </span>
           )}
@@ -140,9 +140,9 @@ export function PokerTableView(props: PokerTableViewProps) {
             )}
           </div>
           {table && (
-            <div className="rounded-full border border-gold/30 bg-charcoal-900/40 px-4 py-1.5">
+            <div className="rounded-full border border-velvet/30 bg-charcoal-900/40 px-4 py-1.5">
               <span className="text-xs text-ash">Pot </span>
-              <span className="font-mono text-gold">
+              <span className="font-mono text-velvet">
                 {formatAmount(props.asset, BigInt(table.totalPot))} {props.asset}
               </span>
             </div>

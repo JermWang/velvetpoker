@@ -24,7 +24,7 @@
     background-attachment: fixed;
   }
   ::selection {
-    @apply bg-gold/30 text-ivory;
+    @apply bg-velvet/30 text-ivory;
   }
 }
 
@@ -79,7 +79,7 @@
       0 24px 64px -28px rgba(0, 0, 0, 0.75),
       inset 0 1px 0 rgba(255, 255, 255, 0.07);
   }
-  .glass-gold {
+  .glass-velvet {
     border-color: rgba(143, 29, 44, 0.35);
     box-shadow:
       0 24px 64px -26px rgba(0, 0, 0, 0.75),
@@ -98,6 +98,6 @@
       0 0 34px -8px rgba(143, 29, 44, 0.42);
   }
   .text-eyebrow {
-    @apply text-xs uppercase tracking-[0.25em] text-gold/80;
+    @apply text-xs uppercase tracking-[0.25em] text-velvet/80;
   }
 }

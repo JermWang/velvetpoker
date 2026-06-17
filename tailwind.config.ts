@@ -22,34 +22,27 @@ const config: Config = {
           700: "#23272f",
           600: "#2f343d",
         },
-        // Cream — the warm light tone that pairs with velvet. Primary text +
-        // surfaces lean cream rather than a cold white.
+        // Primary text — a clean, near-white neutral grey. High contrast on the
+        // dark base for easy reading. (Token kept named `ivory` for legacy reasons.)
         ivory: {
-          DEFAULT: "#f3ecdd",
-          muted: "#ddd3bf",
-        },
-        cream: {
-          DEFAULT: "#f3ecdd",
-          soft: "#e7dcc6",
-          deep: "#cdbfa3",
+          DEFAULT: "#eceef1",
+          muted: "#c7ccd3",
         },
         felt: {
           DEFAULT: "#12382b",
           light: "#1b4d3a",
           dark: "#0c2820",
         },
-        // Velvet red — the namesake accent. (Token is named `gold` for legacy
-        // reasons; its value is the deep velvet red used across the UI.)
-        gold: {
+        // Velvet red — the namesake accent (buttons, highlights, borders, glows).
+        velvet: {
           DEFAULT: "#8f1d2c",
           soft: "#b03a48",
           dim: "#5b111d",
         },
-        // Secondary text — a warm cream-gray (was a cold gray), lifted for
-        // readability on the dark base.
+        // Secondary text — a neutral grey, lifted for readability on the dark base.
         ash: {
-          DEFAULT: "#b8b0a0",
-          dim: "#8a8275",
+          DEFAULT: "#9aa1ab",
+          dim: "#6b727c",
         },
       },
       fontFamily: {
@@ -63,7 +56,7 @@ const config: Config = {
       },
       boxShadow: {
         elevated: "0 20px 60px -20px rgba(0,0,0,0.7)",
-        gold: "0 0 0 1px rgba(143,29,44,0.28)",
+        velvet: "0 0 0 1px rgba(143,29,44,0.28)",
       },
       backgroundImage: {
         "felt-radial":

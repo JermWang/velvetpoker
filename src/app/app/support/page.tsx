@@ -45,11 +45,11 @@ export default async function SupportPage() {
 
       <p className="text-sm text-ash">
         Need more help? Review our{" "}
-        <Link href="/legal/rules" className="text-gold">
+        <Link href="/legal/rules" className="text-velvet">
           game rules
         </Link>{" "}
         and{" "}
-        <Link href="/legal/responsible-gaming" className="text-gold">
+        <Link href="/legal/responsible-gaming" className="text-velvet">
           responsible gaming
         </Link>{" "}
         resources.

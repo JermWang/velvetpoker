@@ -6,7 +6,7 @@ type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-gold text-ivory hover:bg-gold-soft shadow-gold font-medium",
+    "bg-velvet text-ivory hover:bg-velvet-soft shadow-velvet font-medium",
   secondary:
     "border border-white/12 bg-white/5 text-ivory hover:bg-white/10",
   ghost: "text-ivory/80 hover:text-ivory hover:bg-white/5",
@@ -30,7 +30,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-xl transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 disabled:opacity-40 disabled:pointer-events-none",
+        "inline-flex items-center justify-center gap-2 rounded-xl transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-velvet/60 disabled:opacity-40 disabled:pointer-events-none",
         variants[variant],
         sizes[size],
         className,

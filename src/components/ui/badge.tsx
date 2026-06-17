@@ -1,11 +1,11 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-type Tone = "neutral" | "gold" | "green" | "amber" | "red";
+type Tone = "neutral" | "velvet" | "green" | "amber" | "red";
 
 const tones: Record<Tone, string> = {
   neutral: "border-white/12 text-ash bg-white/5",
-  gold: "border-gold/30 text-gold bg-gold/10",
+  velvet: "border-velvet/30 text-velvet bg-velvet/10",
   green: "border-emerald-500/30 text-emerald-300 bg-emerald-500/10",
   amber: "border-amber-500/30 text-amber-300 bg-amber-500/10",
   red: "border-red-500/30 text-red-300 bg-red-500/10",
@@ -43,7 +43,7 @@ export function StatusBadge({ status }: { status: string }) {
     PAUSED: "amber",
     REQUESTED: "amber",
     DETECTED: "amber",
-    CONFIRMED: "gold",
+    CONFIRMED: "velvet",
     CREDITED: "green",
     SUSPENDED: "red",
     BLOCKED: "red",

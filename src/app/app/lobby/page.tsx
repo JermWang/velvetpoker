@@ -33,8 +33,8 @@ export default async function LobbyPage() {
   return (
     <div className="space-y-10 py-2">
       {/* Private-room banner — the house specialty. */}
-      <div className="glass glass-gold relative overflow-hidden p-7">
-        <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-gold/10 blur-3xl" />
+      <div className="glass glass-velvet relative overflow-hidden p-7">
+        <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-velvet/10 blur-3xl" />
         <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div className="max-w-lg">
             <p className="text-eyebrow">Invite-only</p>

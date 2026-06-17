@@ -41,7 +41,7 @@ export function ActionBar({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gold/30 bg-charcoal-800/90 p-3">
+    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-velvet/30 bg-charcoal-800/90 p-3">
       <Button variant="ghost" onClick={() => onAction("FOLD")}>
         Fold
       </Button>

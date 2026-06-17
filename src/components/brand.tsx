@@ -28,7 +28,7 @@ export function Wordmark({
       />
       <span className="font-display text-lg tracking-wide text-ivory">
         {APP_NAME}
-        <span className="text-gold">.</span>
+        <span className="text-velvet">.</span>
       </span>
     </Link>
   );

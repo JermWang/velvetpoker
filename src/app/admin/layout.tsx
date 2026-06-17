@@ -17,7 +17,7 @@ export default async function AdminLayout({
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
             <Wordmark href="/admin" />
-            <Badge tone="gold">Admin</Badge>
+            <Badge tone="velvet">Admin</Badge>
           </div>
           <Link href="/app" className="text-sm text-ash hover:text-ivory">
             Exit to app

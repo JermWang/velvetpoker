@@ -28,7 +28,7 @@ export default async function AdminOverview() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {metrics.map((m) => (
           <Link key={m.label} href={m.href}>
-            <Card className="transition-colors hover:border-gold/30">
+            <Card className="transition-colors hover:border-velvet/30">
               <CardContent className="py-5">
                 <p className="text-xs text-ash">{m.label}</p>
                 <p className="mt-1 font-mono text-3xl text-ivory">{m.value}</p>

@@ -13,7 +13,7 @@ export default function StartScreen() {
           className="absolute left-1/2 top-[42%] h-[88vh] w-[88vh] max-w-[1040px] -translate-x-1/2 -translate-y-1/2 rounded-full"
           style={{
             background:
-              "radial-gradient(closest-side, rgba(243,236,221,0.13), rgba(243,236,221,0.05) 46%, transparent 72%)",
+              "radial-gradient(closest-side, rgba(236,238,241,0.12), rgba(236,238,241,0.045) 46%, transparent 72%)",
             filter: "blur(40px)",
           }}
         />
@@ -56,7 +56,7 @@ export default function StartScreen() {
           className="mt-3 font-display text-6xl leading-none tracking-tight text-ivory md:text-8xl animate-fade-up"
           style={{ animationDelay: "140ms" }}
         >
-          Velvet<span className="text-gold">.</span>
+          Velvet<span className="text-velvet">.</span>
         </h1>
 
         <p
@@ -87,9 +87,9 @@ export default function StartScreen() {
           style={{ animationDelay: "380ms" }}
         >
           <span>Provably fair</span>
-          <span className="text-gold/40">◆</span>
+          <span className="text-velvet/40">◆</span>
           <span>Instant settlement</span>
-          <span className="text-gold/40">◆</span>
+          <span className="text-velvet/40">◆</span>
           <span>Invite-only tables</span>
         </div>
       </main>

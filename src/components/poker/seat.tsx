@@ -29,7 +29,7 @@ export function Seat({
         empty
           ? "border-dashed border-white/10 bg-transparent"
           : "border-white/10 bg-charcoal-800/80",
-        isToAct && "border-gold/60 shadow-gold",
+        isToAct && "border-velvet/60 shadow-velvet",
         seat.hasFolded && "opacity-40",
       )}
     >
@@ -42,7 +42,7 @@ export function Seat({
               className={cn(
                 "grid h-9 w-9 place-items-center rounded-full border text-xs",
                 isYou
-                  ? "border-gold/50 bg-gold/15 text-gold"
+                  ? "border-velvet/50 bg-velvet/15 text-velvet"
                   : "border-white/15 bg-white/5 text-ivory",
               )}
             >
@@ -84,10 +84,10 @@ export function Seat({
               </span>
             )}
             {seat.isAllIn && (
-              <span className="text-[10px] font-semibold text-gold">ALL-IN</span>
+              <span className="text-[10px] font-semibold text-velvet">ALL-IN</span>
             )}
             {BigInt(seat.committedThisStreet) > 0n && (
-              <span className="font-mono text-[11px] text-gold">
+              <span className="font-mono text-[11px] text-velvet">
                 {formatAmount(asset, BigInt(seat.committedThisStreet))}
               </span>
             )}

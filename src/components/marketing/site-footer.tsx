@@ -16,7 +16,7 @@ export function SiteFooter() {
           <div className="max-w-md">
             <p className="font-display text-lg text-ivory">
               {APP_NAME_FULL}
-              <span className="text-gold">.</span>
+              <span className="text-velvet">.</span>
             </p>
             <p className="mt-3 text-sm leading-relaxed text-ash">
               A private real-money poker room on Solana. Play responsibly. Games

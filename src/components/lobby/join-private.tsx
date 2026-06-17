@@ -32,7 +32,7 @@ export function JoinPrivate() {
         value={code}
         onChange={(e) => setCode(e.target.value)}
         placeholder="Private invite code"
-        className="h-10 flex-1 rounded-xl border border-white/12 bg-charcoal-900/60 px-3 text-sm text-ivory placeholder:text-ash/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+        className="h-10 flex-1 rounded-xl border border-white/12 bg-charcoal-900/60 px-3 text-sm text-ivory placeholder:text-ash/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-velvet/50"
         aria-label="Invite code"
       />
       <Button type="submit" variant="secondary" disabled={busy}>

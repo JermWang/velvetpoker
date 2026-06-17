@@ -41,7 +41,7 @@ export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
       {isAdmin && (
         <Link
           href="/admin"
-          className="mt-4 rounded-lg border border-gold/25 px-3 py-2 text-sm text-gold hover:bg-gold/10"
+          className="mt-4 rounded-lg border border-velvet/25 px-3 py-2 text-sm text-velvet hover:bg-velvet/10"
         >
           Admin console
         </Link>

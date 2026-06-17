@@ -31,11 +31,11 @@ export default async function SignInPage() {
         </div>
         <p className="mt-6 text-center text-xs text-ash/60">
           By continuing you agree to our{" "}
-          <Link href="/legal/terms" className="text-gold">
+          <Link href="/legal/terms" className="text-velvet">
             Terms
           </Link>{" "}
           and{" "}
-          <Link href="/legal/responsible-gaming" className="text-gold">
+          <Link href="/legal/responsible-gaming" className="text-velvet">
             Responsible Gaming
           </Link>{" "}
           policy.
