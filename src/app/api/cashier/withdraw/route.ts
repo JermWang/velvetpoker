@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/require-user";
 import { parseAmount } from "@/lib/ledger/money";
 import { requestWithdrawal } from "@/lib/solana/withdrawals";
 import { writeAuditLog } from "@/lib/auth/audit";
+import { tooMany } from "@/lib/security/rate-limit";
 
 const schema = z.object({
   asset: z.enum(["SOL", "USDC"]),
@@ -12,6 +13,9 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
+  const limited = tooMany(req, "withdraw", { capacity: 5, refillPerSec: 0.1 });
+  if (limited) return limited;
+
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (user.status === "BLOCKED") {

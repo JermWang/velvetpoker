@@ -8,6 +8,7 @@ import { canPlayRealMoney } from "@/lib/compliance/gates";
 import { PokerTableView } from "@/components/poker/poker-table-view";
 import { ComplianceGateCard } from "@/components/app-shell/compliance-gate-card";
 import { ConnectButton } from "@/components/auth/connect-button";
+import { signWsTicket } from "@/lib/realtime/ws-ticket";
 
 export const dynamic = "force-dynamic";
 
@@ -23,19 +24,19 @@ export default async function TablePage({
   if (!table || table.status === "CLOSED") notFound();
 
   // WS auth for an authenticated user: the site (Vercel) and the ws server
-  // (Railway) are on different hosts, so the `privy-token` cookie isn't sent on
-  // the cross-origin WebSocket handshake. We read it here on the server and pass
-  // it as `?token=` instead — the ws verifies it the same way. Dev cookie fallback.
+  // (Railway) are on different hosts, so the auth cookie isn't sent on the
+  // cross-origin handshake. We mint a short-lived signed ticket here (we hold
+  // the verified session) and the ws verifies it — the Privy token never enters
+  // a URL. Dev cookie fallback for local (Privy-unconfigured) only.
   const privyConfigured = Boolean(env.privyAppId && env.privyAppSecret);
-  const privyToken = cookies().get("privy-token")?.value;
   const devEmail = cookies().get("velvet_dev_user")?.value;
-  const userAuthQuery = privyConfigured
-    ? privyToken
-      ? `token=${encodeURIComponent(privyToken)}`
-      : ""
-    : !env.isProduction && devEmail
-      ? `dev=${encodeURIComponent(devEmail)}`
-      : "";
+  const userAuthQuery = user
+    ? privyConfigured
+      ? `ticket=${encodeURIComponent(signWsTicket(user.id))}`
+      : !env.isProduction && devEmail
+        ? `dev=${encodeURIComponent(devEmail)}`
+        : ""
+    : "";
 
   // Free-play demo table: anyone plays for free — logged in or as a guest — with
   // no compliance gate and no real money. Guests get an ephemeral client-side id.

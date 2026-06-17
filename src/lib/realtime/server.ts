@@ -14,11 +14,11 @@ import http from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
 import { prisma } from "@/lib/db/prisma";
 import { env } from "@/lib/env";
-import { verifyPrivyToken } from "@/lib/auth/privy";
 import { lockBuyIn, cashOutSeat } from "@/lib/ledger/ledger";
 import { TableRoom, type RoomConfig } from "./table-room";
 import { attachHandPersistence } from "./persistence";
 import { decode, encode, type ServerEvent } from "./events";
+import { verifyWsTicket } from "./ws-ticket";
 import { startBackgroundWorkers } from "@/lib/jobs/worker";
 
 interface Client {
@@ -41,39 +41,29 @@ interface RoomEntry {
 
 const rooms = new Map<string, RoomEntry>();
 
+// Per-connection message rate limit (token bucket).
+const WS_MSG_BURST = 30;
+const WS_MSG_REFILL_PER_SEC = 15;
+
 function sendTo(client: Client, event: ServerEvent): void {
   if (client.ws.readyState === client.ws.OPEN) {
     client.ws.send(encode(event));
   }
 }
 
-function parseCookies(header: string | undefined): Record<string, string> {
-  const out: Record<string, string> = {};
-  if (!header) return out;
-  for (const part of header.split(";")) {
-    const idx = part.indexOf("=");
-    if (idx === -1) continue;
-    const k = part.slice(0, idx).trim();
-    const v = part.slice(idx + 1).trim();
-    if (k) out[k] = decodeURIComponent(v);
-  }
-  return out;
-}
-
 async function resolveIdentity(
   url: URL,
-  cookieHeader: string | undefined,
 ): Promise<{ userId: string; displayName: string } | null> {
-  // Prefer the Privy access-token cookie sent on the WS handshake (same host,
-  // so localhost cookies reach :3001), falling back to a query token.
-  const cookies = parseCookies(cookieHeader);
-  const token = cookies["privy-token"] ?? url.searchParams.get("token");
-  const identity = await verifyPrivyToken(token);
-  if (identity) {
-    const user = await prisma.user.findUnique({
-      where: { privyUserId: identity.privyUserId },
-    });
-    if (user) return { userId: user.id, displayName: user.displayName ?? "Player" };
+  // Authenticated players present a short-lived, signed ticket minted by the web
+  // app (which holds the verified Privy session). The raw Privy token never
+  // touches the WS URL.
+  const ticket = url.searchParams.get("ticket");
+  if (ticket) {
+    const userId = verifyWsTicket(ticket);
+    if (userId) {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user) return { userId: user.id, displayName: user.displayName ?? "Player" };
+    }
   }
   // Dev-only impersonation fallback. Hard-gated to environments where Privy is
   // NOT configured (true local dev) so it can never be reached in production,
@@ -359,7 +349,16 @@ export function startServer(
 
   wss.on("connection", async (ws, req) => {
     const url = new URL(req.url ?? "/", `http://localhost:${port}`);
-    const identity = await resolveIdentity(url, req.headers.cookie);
+
+    // Buffer any messages that arrive while we authenticate (resolveIdentity
+    // does a DB lookup): clients send JOIN_TABLE immediately on open, and
+    // without this the JOIN would be dropped because no message listener is
+    // attached yet — leaving the player with no table state.
+    const early: string[] = [];
+    const earlyHandler = (data: unknown) => early.push(String(data));
+    ws.on("message", earlyHandler);
+
+    const identity = await resolveIdentity(url);
     // Connection modes (in priority order):
     //  - authenticated user (Privy token / dev cookie)
     //  - free-play guest (?guest=<id>) — may sit only at demo tables
@@ -376,6 +375,7 @@ export function startServer(
         : null;
 
     if (!identity && !guestId && !wantsSpectate) {
+      ws.off("message", earlyHandler);
       ws.send(encode({ t: "ERROR", message: "Unauthorized", code: "AUTH" }));
       ws.close();
       return;
@@ -411,9 +411,26 @@ export function startServer(
       };
     }
 
-    ws.on("message", (data) => {
-      void handleEvent(client, data.toString());
-    });
+    // Per-connection flood protection (token bucket). Normal play sends a
+    // handful of messages per action; a flood is silently dropped.
+    const rl = { tokens: WS_MSG_BURST, last: Date.now() };
+    const accept = (raw: string): void => {
+      const now = Date.now();
+      rl.tokens = Math.min(
+        WS_MSG_BURST,
+        rl.tokens + ((now - rl.last) / 1000) * WS_MSG_REFILL_PER_SEC,
+      );
+      rl.last = now;
+      if (rl.tokens < 1) return; // throttled — drop
+      rl.tokens -= 1;
+      void handleEvent(client, raw);
+    };
+
+    // Swap the buffering handler for the real one, then replay anything that
+    // arrived during authentication (e.g. the initial JOIN_TABLE).
+    ws.off("message", earlyHandler);
+    ws.on("message", (data) => accept(String(data)));
+    for (const raw of early) accept(raw);
     ws.on("close", () => {
       if (client.tableId) {
         const entry = rooms.get(client.tableId);

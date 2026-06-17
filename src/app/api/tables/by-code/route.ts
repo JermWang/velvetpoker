@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/require-user";
 import { prisma } from "@/lib/db/prisma";
+import { tooMany } from "@/lib/security/rate-limit";
 
 /** Resolve a private-table invite code to its table id so the client can join. */
 export async function GET(req: Request) {
+  // Throttle to prevent brute-forcing invite codes.
+  const limited = tooMany(req, "table-by-code", { capacity: 15, refillPerSec: 0.5 });
+  if (limited) return limited;
+
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

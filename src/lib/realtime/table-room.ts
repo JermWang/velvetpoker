@@ -110,6 +110,11 @@ export class TableRoom {
   private dealerSeat = 0;
   private serverSeed: string | null = null;
   private serverSeedHash: string | null = null;
+  // Pre-committed server seed for the UPCOMING hand (commit-ahead chain): its
+  // hash is published a hand early, before that hand's client seeds exist, so
+  // the operator cannot grind the deck.
+  private committedServerSeed: string | null = null;
+  private committedServerSeedHash: string | null = null;
   private actionTimer: ReturnType<typeof setTimeout> | null = null;
   private actionDeadline: number | null = null;
 
@@ -126,6 +131,18 @@ export class TableRoom {
     this.config = config;
     this.send = io.send;
     this.broadcast = io.broadcast;
+    // Commit the first hand's server seed up front, before anyone is seated.
+    this.commitNextSeed();
+  }
+
+  /**
+   * Generate + commit the server seed for the next hand. The commitment hash is
+   * surfaced in table state (so clients see it before submitting that hand's
+   * client seeds); the seed itself is revealed only after the hand.
+   */
+  private commitNextSeed(): void {
+    this.committedServerSeed = generateServerSeed();
+    this.committedServerSeedHash = hashServerSeed(this.committedServerSeed);
   }
 
   // ---- seating -----------------------------------------------------------
@@ -236,15 +253,24 @@ export class TableRoom {
     // Rotate the button to the next eligible seat.
     this.dealerSeat = this.nextDealerSeat(players);
 
-    // Commit-reveal: publish hash before dealing.
-    this.serverSeed = generateServerSeed();
-    this.serverSeedHash = hashServerSeed(this.serverSeed);
+    // Commit-reveal: use the seed committed a hand in advance (its hash was
+    // already published in table state), then commit the next hand's seed.
+    if (!this.committedServerSeed || !this.committedServerSeedHash) {
+      this.commitNextSeed();
+    }
+    const serverSeed = this.committedServerSeed as string;
+    const serverSeedHash = this.committedServerSeedHash as string;
+    this.serverSeed = serverSeed;
+    this.serverSeedHash = serverSeedHash;
+    this.committedServerSeed = null;
+    this.committedServerSeedHash = null;
+    this.commitNextSeed();
     const clientSeeds = players
       .map((p) => this.clientSeeds.get(p.playerId))
       .filter((s): s is string => !!s);
 
     const deck = shuffleDeckFromSeed({
-      serverSeed: this.serverSeed,
+      serverSeed,
       tableId: this.config.tableId,
       handId,
       clientSeeds,
@@ -272,7 +298,7 @@ export class TableRoom {
       t: "HAND_STARTED",
       tableId: this.config.tableId,
       handId,
-      serverSeedHash: this.serverSeedHash,
+      serverSeedHash,
       dealerSeat: this.dealerSeat,
     });
 
@@ -283,7 +309,7 @@ export class TableRoom {
       dealerSeat: this.dealerSeat,
       smallBlindSeat: this.hand.smallBlindSeat,
       bigBlindSeat: this.hand.bigBlindSeat,
-      serverSeedHash: this.serverSeedHash,
+      serverSeedHash,
       deckHash: deckHash(deck),
       clientSeeds,
       algorithm: ALGORITHM,
@@ -577,6 +603,7 @@ export class TableRoom {
       seats,
       handId: this.hand?.handId ?? null,
       serverSeedHash: this.serverSeedHash,
+      nextServerSeedHash: this.committedServerSeedHash,
     };
   }
 

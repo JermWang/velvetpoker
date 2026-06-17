@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { parseAmount } from "@/lib/ledger/money";
 import { generateInviteCode, hashPassword } from "@/lib/crypto";
 import { writeAuditLog } from "@/lib/auth/audit";
+import { tooMany } from "@/lib/security/rate-limit";
 
 const createSchema = z.object({
   name: z.string().min(2).max(40),
@@ -21,6 +22,9 @@ const createSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  const limited = tooMany(req, "table-create", { capacity: 8, refillPerSec: 0.1 });
+  if (limited) return limited;
+
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

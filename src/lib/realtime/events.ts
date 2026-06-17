@@ -57,6 +57,12 @@ export interface WireTableState {
   seats: WireSeat[];
   handId: string | null;
   serverSeedHash: string | null;
+  /**
+   * Commitment (sha256) for the NEXT hand's server seed, published a hand in
+   * advance — before that hand's client seeds are submitted — so the operator
+   * cannot grind the deck. Verifiable when the seed is later revealed.
+   */
+  nextServerSeedHash: string | null;
 }
 
 export type ServerEvent =

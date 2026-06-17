@@ -115,6 +115,37 @@ async function main() {
   const stateEv = [...g1.events, ...g2.events].reverse().find((e) => e.t === "TABLE_STATE") as { state?: { seats?: { playerId: string | null }[] } } | undefined;
   void stateEv;
 
+  // Signed-ticket auth: a real (dev-seeded) user authenticates via ?ticket=.
+  const realUser = await prisma.user.findFirst({
+    where: { privyUserId: { startsWith: "dev:" } },
+  });
+  if (realUser) {
+    const { signWsTicket } = await import("../src/lib/realtime/ws-ticket");
+    const ticket = signWsTicket(realUser.id);
+    const tw = await new Promise<Client>((resolve, reject) => {
+      const ws = new WebSocket(`ws://localhost:${PORT}?ticket=${encodeURIComponent(ticket)}`);
+      const c: Client = { ws, id: realUser.id, events: [] };
+      ws.on("open", () => { ws.send(JSON.stringify({ t: "JOIN_TABLE", tableId: table.id })); resolve(c); });
+      ws.on("message", (r) => c.events.push(JSON.parse(r.toString())));
+      ws.on("error", reject);
+    });
+    await sleep(400);
+    const authErr = tw.events.find((e) => e.t === "ERROR" && (e as { code?: string }).code === "AUTH");
+    assert(sawEvent(tw, "TABLE_STATE") && !authErr, "a valid signed ticket authenticates a real user");
+    // A bogus ticket is rejected.
+    const bad = await new Promise<Client>((resolve, reject) => {
+      const ws = new WebSocket(`ws://localhost:${PORT}?ticket=forged.garbage.sig`);
+      const c: Client = { ws, id: "bad", events: [] };
+      ws.on("open", () => { ws.send(JSON.stringify({ t: "JOIN_TABLE", tableId: table.id })); resolve(c); });
+      ws.on("message", (r) => c.events.push(JSON.parse(r.toString())));
+      ws.on("error", reject);
+    });
+    await sleep(300);
+    assert(bad.events.some((e) => e.t === "ERROR" && (e as { code?: string }).code === "AUTH"), "a forged ticket is rejected (Unauthorized)");
+    tw.ws.close();
+    bad.ws.close();
+  }
+
   console.log("\n✅ GUEST PLAY CHECKS PASSED");
   g1.ws.close();
   g2.ws.close();
