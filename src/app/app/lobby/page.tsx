@@ -10,8 +10,8 @@ export const dynamic = "force-dynamic";
 export default async function LobbyPage() {
   const tables = await prisma.pokerTable.findMany({
     where: { visibility: "PUBLIC", status: { in: ["WAITING", "ACTIVE"] } },
-    // Free-play demo first, then live games, then newest.
-    orderBy: [{ isDemo: "desc" }, { status: "asc" }, { createdAt: "desc" }],
+    // Free-play demo first, then cash games ordered low → high roller (by stakes).
+    orderBy: [{ isDemo: "desc" }, { bigBlind: "asc" }, { smallBlind: "asc" }],
     include: { seats: { where: { status: { not: "EMPTY" } } } },
   });
 

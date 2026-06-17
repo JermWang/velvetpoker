@@ -23,7 +23,8 @@ export default async function AppLayout({
       {/* Top nav */}
       <header className="sticky top-0 z-30 border-b border-white/8 bg-charcoal-900/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-          <Wordmark href="/app" />
+          {/* Logo returns to the splash page. */}
+          <Wordmark href="/" />
           <div className="flex items-center gap-4">
             {user && balances ? (
               <>

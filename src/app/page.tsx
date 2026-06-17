@@ -13,7 +13,7 @@ export default function StartScreen() {
           className="absolute left-1/2 top-[42%] h-[88vh] w-[88vh] max-w-[1040px] -translate-x-1/2 -translate-y-1/2 rounded-full"
           style={{
             background:
-              "radial-gradient(closest-side, rgba(200,169,106,0.20), rgba(200,169,106,0.07) 46%, transparent 72%)",
+              "radial-gradient(closest-side, rgba(243,236,221,0.13), rgba(243,236,221,0.05) 46%, transparent 72%)",
             filter: "blur(40px)",
           }}
         />
@@ -21,8 +21,8 @@ export default function StartScreen() {
           className="absolute left-1/2 top-[40%] h-[44vh] w-[44vh] max-w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full"
           style={{
             background:
-              "radial-gradient(closest-side, rgba(244,221,224,0.12), transparent 70%)",
-            filter: "blur(26px)",
+              "radial-gradient(closest-side, rgba(176,58,72,0.10), transparent 70%)",
+            filter: "blur(28px)",
           }}
         />
       </div>

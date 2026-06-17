@@ -15,30 +15,41 @@ const config: Config = {
     extend: {
       colors: {
         charcoal: {
-          DEFAULT: "#16181c",
+          DEFAULT: "#181b21",
           50: "#f5f6f7",
-          900: "#0c0d10",
-          800: "#16181c",
-          700: "#1f2228",
-          600: "#2b2f37",
+          900: "#0e1014",
+          800: "#181b21",
+          700: "#23272f",
+          600: "#2f343d",
         },
+        // Cream — the warm light tone that pairs with velvet. Primary text +
+        // surfaces lean cream rather than a cold white.
         ivory: {
-          DEFAULT: "#f4f1e8",
-          muted: "#d9d4c5",
+          DEFAULT: "#f3ecdd",
+          muted: "#ddd3bf",
+        },
+        cream: {
+          DEFAULT: "#f3ecdd",
+          soft: "#e7dcc6",
+          deep: "#cdbfa3",
         },
         felt: {
           DEFAULT: "#12382b",
           light: "#1b4d3a",
           dark: "#0c2820",
         },
+        // Velvet red — the namesake accent. (Token is named `gold` for legacy
+        // reasons; its value is the deep velvet red used across the UI.)
         gold: {
           DEFAULT: "#8f1d2c",
           soft: "#b03a48",
           dim: "#5b111d",
         },
+        // Secondary text — a warm cream-gray (was a cold gray), lifted for
+        // readability on the dark base.
         ash: {
-          DEFAULT: "#8b8f99",
-          dim: "#5b5f68",
+          DEFAULT: "#b8b0a0",
+          dim: "#8a8275",
         },
       },
       fontFamily: {
@@ -58,7 +69,7 @@ const config: Config = {
         "felt-radial":
           "radial-gradient(ellipse at center, #1b4d3a 0%, #12382b 55%, #0c2820 100%)",
         "charcoal-fade":
-          "linear-gradient(180deg, #16181c 0%, #0c0d10 100%)",
+          "linear-gradient(180deg, #181b21 0%, #0e1014 100%)",
       },
       keyframes: {
         "fade-up": {
