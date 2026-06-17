@@ -69,13 +69,17 @@ export default async function TablePage({
     );
   }
 
-  // WS auth: when Privy is configured the `privy-token` cookie is sent on the
-  // WebSocket handshake (same host), so no query auth is needed. Otherwise fall
-  // back to the dev cookie in development.
+  // WS auth: the site (Vercel) and the ws game server (Railway) are on different
+  // hosts, so the `privy-token` cookie isn't sent on the cross-origin WebSocket
+  // handshake. We read it here on the server and pass it as `?token=` instead —
+  // the ws verifies it the same way. Falls back to the dev cookie in development.
   const privyConfigured = Boolean(env.privyAppId && env.privyAppSecret);
+  const privyToken = cookies().get("privy-token")?.value;
   const devEmail = cookies().get("velvet_dev_user")?.value;
   const authQuery = privyConfigured
-    ? ""
+    ? privyToken
+      ? `token=${encodeURIComponent(privyToken)}`
+      : ""
     : !env.isProduction && devEmail
       ? `dev=${encodeURIComponent(devEmail)}`
       : "";
