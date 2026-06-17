@@ -1,0 +1,479 @@
+// Velvet Poker — data model.
+//
+// Money rules baked into this schema:
+//  * All monetary amounts are BigInt integers (lamports for SOL, base units for USDC).
+//  * Balances are a denormalized cache that MUST reconcile to the LedgerEntry table.
+//  * No balance is ever mutated outside a ledger transaction (see src/lib/ledger).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  SELF_EXCLUDED
+  BLOCKED
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum GeofenceStatus {
+  UNKNOWN
+  ALLOWED
+  BLOCKED
+}
+
+enum Asset {
+  SOL
+  USDC
+}
+
+enum Chain {
+  SOLANA
+}
+
+enum WalletType {
+  EMBEDDED
+  EXTERNAL
+  DEPOSIT
+  HOT
+  TREASURY
+}
+
+enum LedgerDirection {
+  DEBIT
+  CREDIT
+}
+
+enum LedgerAccountType {
+  USER_AVAILABLE
+  USER_TABLE_LOCKED
+  TABLE_POT
+  PLATFORM_REVENUE
+  WITHDRAWAL_PENDING
+  TREASURY_CASH
+  ADJUSTMENT
+}
+
+enum LedgerReason {
+  DEPOSIT_CONFIRMED
+  TABLE_BUY_IN
+  BLIND_POSTED
+  BET_PLACED
+  POT_AWARDED
+  TABLE_CASH_OUT
+  WITHDRAWAL_REQUESTED
+  WITHDRAWAL_SENT
+  WITHDRAWAL_REJECTED
+  ADMIN_ADJUSTMENT
+  RAKE_TAKEN
+}
+
+enum DepositStatus {
+  DETECTED
+  CONFIRMED
+  CREDITED
+  FAILED
+}
+
+enum WithdrawalStatus {
+  REQUESTED
+  PENDING_REVIEW
+  APPROVED
+  SENT
+  REJECTED
+  FAILED
+}
+
+enum GameType {
+  HOLDEM
+}
+
+enum TableVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum TableStatus {
+  WAITING
+  ACTIVE
+  PAUSED
+  CLOSED
+}
+
+enum SeatStatus {
+  EMPTY
+  SEATED
+  SITTING_OUT
+  LEFT
+}
+
+enum HandStatus {
+  PENDING
+  PREFLOP
+  FLOP
+  TURN
+  RIVER
+  SHOWDOWN
+  COMPLETE
+  CANCELLED
+}
+
+enum Street {
+  PREFLOP
+  FLOP
+  TURN
+  RIVER
+  SHOWDOWN
+}
+
+enum ActionType {
+  FOLD
+  CHECK
+  CALL
+  BET
+  RAISE
+  ALL_IN
+  POST_SMALL_BLIND
+  POST_BIG_BLIND
+  TIMEOUT_FOLD
+}
+
+enum RiskEventType {
+  MULTI_ACCOUNT_SUSPECTED
+  COLLUSION_SUSPECTED
+  GEO_BLOCKED
+  KYC_FAILED
+  WITHDRAWAL_REVIEW
+  ADMIN_ACTION
+  RESPONSIBLE_GAMING_LIMIT
+}
+
+enum RiskSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ---------------------------------------------------------------------------
+// Core identity
+// ---------------------------------------------------------------------------
+
+model User {
+  id             String         @id @default(cuid())
+  privyUserId    String         @unique
+  email          String?        @unique
+  displayName    String?
+  role           Role           @default(USER)
+  status         UserStatus     @default(ACTIVE)
+  kycStatus      KycStatus      @default(NOT_STARTED)
+  ageVerifiedAt  DateTime?
+  country        String?
+  region         String?
+  geofenceStatus GeofenceStatus @default(UNKNOWN)
+
+  // Responsible gaming
+  depositLimitDaily   BigInt?
+  selfExcludedUntil   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  wallets      Wallet[]
+  balances     Balance[]
+  ledger       LedgerEntry[]
+  deposits     Deposit[]
+  withdrawals  Withdrawal[]
+  seats        TableSeat[]
+  hostedTables PokerTable[]  @relation("HostedTables")
+  handActions  HandAction[]
+  handResults  HandResult[]
+  riskEvents   RiskEvent[]
+  auditLogs    AuditLog[]    @relation("ActorAudit")
+
+  @@index([status])
+  @@index([kycStatus])
+}
+
+model Wallet {
+  id            String     @id @default(cuid())
+  userId        String?
+  chain         Chain      @default(SOLANA)
+  address       String
+  privyWalletId String?
+  type          WalletType
+  createdAt     DateTime   @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([chain, address])
+  @@index([userId])
+}
+
+model Balance {
+  id              String   @id @default(cuid())
+  userId          String
+  asset           Asset
+  availableAmount BigInt   @default(0)
+  lockedAmount    BigInt   @default(0)
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, asset])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Ledger (double-entry). Every monetary movement is a row here.
+// ---------------------------------------------------------------------------
+
+model LedgerEntry {
+  id            String            @id @default(cuid())
+  userId        String?
+  tableId       String?
+  handId        String?
+  asset         Asset
+  amount        BigInt
+  direction     LedgerDirection
+  accountType   LedgerAccountType
+  reason        LedgerReason
+  correlationId String
+  metadata      Json?
+  createdAt     DateTime          @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([correlationId])
+  @@index([tableId])
+  @@index([handId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Cashier
+// ---------------------------------------------------------------------------
+
+model Deposit {
+  id            String        @id @default(cuid())
+  userId        String
+  asset         Asset
+  chain         Chain         @default(SOLANA)
+  fromAddress   String?
+  toAddress     String
+  txSignature   String        @unique
+  amount        BigInt
+  confirmations Int           @default(0)
+  status        DepositStatus @default(DETECTED)
+  createdAt     DateTime      @default(now())
+  creditedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Withdrawal {
+  id          String           @id @default(cuid())
+  userId      String
+  asset       Asset
+  toAddress   String
+  amount      BigInt
+  status      WithdrawalStatus @default(REQUESTED)
+  txSignature String?
+  reviewedBy  String?
+  reviewNote  String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Tables & seats
+// ---------------------------------------------------------------------------
+
+model PokerTable {
+  id                   String          @id @default(cuid())
+  hostUserId           String?
+  name                 String
+  gameType             GameType        @default(HOLDEM)
+  asset                Asset
+  smallBlind           BigInt
+  bigBlind             BigInt
+  minBuyIn             BigInt
+  maxBuyIn             BigInt
+  maxSeats             Int
+  visibility           TableVisibility @default(PUBLIC)
+  passwordHash         String?
+  inviteCode           String          @unique
+  status               TableStatus     @default(WAITING)
+  actionTimeoutSeconds Int             @default(30)
+  spectatorsAllowed    Boolean         @default(true)
+  rakeBps              Int             @default(0)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  host  User?       @relation("HostedTables", fields: [hostUserId], references: [id], onDelete: SetNull)
+  seats TableSeat[]
+  hands Hand[]
+
+  @@index([status])
+  @@index([visibility])
+}
+
+model TableSeat {
+  id          String     @id @default(cuid())
+  tableId     String
+  userId      String?
+  seatNumber  Int
+  stackAmount BigInt     @default(0)
+  status      SeatStatus @default(EMPTY)
+  joinedAt    DateTime?
+  leftAt      DateTime?
+
+  table PokerTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  user  User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([tableId, seatNumber])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Hands, actions, results, RNG proofs
+// ---------------------------------------------------------------------------
+
+model Hand {
+  id             String     @id @default(cuid())
+  tableId        String
+  handNumber     Int
+  dealerSeat     Int
+  smallBlindSeat Int
+  bigBlindSeat   Int
+  status         HandStatus @default(PENDING)
+  potAmount      BigInt     @default(0)
+  rakeAmount     BigInt     @default(0)
+  serverSeedHash String
+  serverSeed     String?
+  deckHash       String
+  startedAt      DateTime   @default(now())
+  completedAt    DateTime?
+
+  table   PokerTable   @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  actions HandAction[]
+  results HandResult[]
+  rngProof RngProof?
+
+  @@unique([tableId, handNumber])
+  @@index([tableId])
+  @@index([status])
+}
+
+model HandAction {
+  id         String     @id @default(cuid())
+  handId     String
+  userId     String
+  seatNumber Int
+  action     ActionType
+  amount     BigInt     @default(0)
+  street     Street
+  createdAt  DateTime   @default(now())
+
+  hand Hand @relation(fields: [handId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([handId])
+  @@index([userId])
+}
+
+model HandResult {
+  id              String   @id @default(cuid())
+  handId          String
+  userId          String
+  seatNumber      Int
+  amountWon       BigInt
+  handDescription String
+  cards           Json
+  createdAt       DateTime @default(now())
+
+  hand Hand @relation(fields: [handId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([handId])
+  @@index([userId])
+}
+
+model RngProof {
+  id             String   @id @default(cuid())
+  handId         String   @unique
+  serverSeedHash String
+  serverSeed     String?
+  clientSeeds    Json
+  algorithm      String
+  verified       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  hand Hand @relation(fields: [handId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// Risk & audit
+// ---------------------------------------------------------------------------
+
+model RiskEvent {
+  id        String        @id @default(cuid())
+  userId    String?
+  tableId   String?
+  handId    String?
+  type      RiskEventType
+  severity  RiskSeverity  @default(LOW)
+  metadata  Json?
+  createdAt DateTime      @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([type])
+  @@index([severity])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorUserId  String?
+  action       String
+  targetType   String
+  targetId     String
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  actor User? @relation("ActorAudit", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([targetType, targetId])
+}

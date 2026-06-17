@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Font CSS variables are provided by next/font (set on <html> via className in
+   layout.tsx). Fallbacks here only apply if those fail to load — declared at a
+   weaker selector than next/font's class so they never override the real font. */
+:where(:root) {
+  --font-display: "Georgia", "Times New Roman", serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-charcoal-900 text-ivory antialiased;
+    font-family: var(--font-sans);
+    background-image:
+      radial-gradient(60rem 60rem at 80% -10%, rgba(143, 29, 44, 0.08), transparent 60%),
+      radial-gradient(50rem 50rem at -10% 110%, rgba(18, 56, 43, 0.35), transparent 60%);
+    background-attachment: fixed;
+  }
+  ::selection {
+    @apply bg-gold/30 text-ivory;
+  }
+}
+
+@keyframes vp-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+/* Barely-there CRT flicker — a slow, calm breathing of warm light. */
+.crt-flicker {
+  background: radial-gradient(
+    100% 100% at 50% 0%,
+    rgba(143, 29, 44, 0.07),
+    rgba(18, 56, 43, 0.03) 60%,
+    transparent 100%
+  );
+  animation: crt-breathe 7.5s ease-in-out infinite;
+}
+@keyframes crt-breathe {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.7; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .crt-flicker { animation: none; opacity: 0.4; }
+  .animate-fade-up { animation: none; }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-6;
+  }
+  .hairline {
+    @apply border-white/8;
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  .card-surface {
+    @apply rounded-2xl border bg-charcoal-800/70 backdrop-blur;
+    border-color: rgba(255, 255, 255, 0.07);
+  }
+  /* Frosted glass surface for premium lobby / option cards. */
+  .glass {
+    border-radius: 1.25rem;
+    background: linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.065),
+      rgba(255, 255, 255, 0.015)
+    );
+    backdrop-filter: blur(16px) saturate(125%);
+    -webkit-backdrop-filter: blur(16px) saturate(125%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow:
+      0 24px 64px -28px rgba(0, 0, 0, 0.75),
+      inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
+  .glass-gold {
+    border-color: rgba(143, 29, 44, 0.35);
+    box-shadow:
+      0 24px 64px -26px rgba(0, 0, 0, 0.75),
+      inset 0 1px 0 rgba(255, 255, 255, 0.07),
+      0 0 28px -10px rgba(143, 29, 44, 0.35);
+  }
+  .glass-hover {
+    transition: transform 0.35s cubic-bezier(0.2, 0.75, 0.2, 1), border-color 0.35s ease, box-shadow 0.35s ease;
+  }
+  .glass-hover:hover {
+    transform: translateY(-3px);
+    border-color: rgba(143, 29, 44, 0.5);
+    box-shadow:
+      0 30px 70px -26px rgba(0, 0, 0, 0.8),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 0 34px -8px rgba(143, 29, 44, 0.42);
+  }
+  .text-eyebrow {
+    @apply text-xs uppercase tracking-[0.25em] text-gold/80;
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "name": "velvet-poker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Velvet Poker — private real-money Solana poker room (internal placeholder name)",
+  "scripts": {
+    "postinstall": "prisma generate",
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "ws": "tsx --env-file=.env src/lib/realtime/server.ts",
+    "ws:prod": "tsx src/lib/realtime/server.ts",
+    "job:deposits": "tsx --env-file=.env src/lib/jobs/deposit-monitor.ts",
+    "job:withdrawals": "tsx --env-file=.env src/lib/jobs/withdrawal-processor.ts",
+    "job:reconcile": "tsx --env-file=.env src/lib/jobs/reconciliation.ts",
+    "worker": "tsx --env-file=.env src/lib/jobs/worker.ts",
+    "worker:prod": "tsx src/lib/jobs/worker.ts",
+    "verify:flow": "tsx --env-file=.env scripts/verify-flow.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "@privy-io/react-auth": "^3.29.2",
+    "@privy-io/server-auth": "^1.32.5",
+    "@solana-program/memo": "0.10.0",
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.95.4",
+    "bs58": "^6.0.0",
+    "clsx": "^2.1.1",
+    "ioredis": "^5.4.1",
+    "next": "^14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.5.4",
+    "tsx": "^4.19.2",
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.6",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/ws": "^8.5.13",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "prisma": "^5.22.0",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  }
+}

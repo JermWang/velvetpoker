@@ -1,0 +1,18 @@
+node_modules
+.next
+.git
+claude_design
+screenshots
+*.log
+.env
+.env*.local
+coverage
+prisma/init.sql
+prisma/init.err
+dev-server.out.log
+dev-server.err.log
+build.log
+# Ship without the lockfile so Railway runs `npm install` (lenient) rather than
+# `npm ci` (strict) — Privy v3's optional peer-deps make the lock version-
+# sensitive across npm versions and break `npm ci` on Railway's Node.
+package-lock.json

@@ -1,0 +1,230 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useTableSocket } from "@/lib/realtime/use-table-socket";
+import { formatAmount, parseAmount } from "@/lib/ledger/money";
+import type { Asset } from "@/lib/ledger/money";
+import type { ActionType } from "@/lib/poker/types";
+import { Seat } from "./seat";
+import { Card3D } from "./card-3d";
+import { ActionBar } from "./action-bar";
+import { BuyInPanel } from "./buy-in-panel";
+import { VerifyHandDrawer } from "./verify-hand-drawer";
+import { Button } from "@/components/ui/button";
+
+export interface PokerTableViewProps {
+  tableId: string;
+  tableName: string;
+  asset: Asset;
+  minBuyIn: string;
+  maxBuyIn: string;
+  wsUrl: string;
+  authQuery: string;
+  youUserId: string;
+}
+
+export function PokerTableView(props: PokerTableViewProps) {
+  const { state, send } = useTableSocket({
+    wsUrl: props.wsUrl,
+    tableId: props.tableId,
+    authQuery: props.authQuery,
+  });
+  const [chatInput, setChatInput] = useState("");
+
+  const table = state.table;
+  const yourSeat = useMemo(
+    () => table?.seats.find((s) => s.playerId === props.youUserId) ?? null,
+    [table, props.youUserId],
+  );
+  const seated = !!yourSeat;
+  const isYourTurn =
+    yourSeat != null && state.yourTurnSeat === yourSeat.seat;
+
+  function act(action: ActionType, amount?: bigint) {
+    send({
+      t: "PLAYER_ACTION",
+      tableId: props.tableId,
+      action,
+      amount: amount?.toString(),
+    });
+  }
+
+  function buyIn(amount: string) {
+    try {
+      const lamports = parseAmount(props.asset, amount);
+      send({ t: "BUY_IN", tableId: props.tableId, amount: lamports.toString() });
+    } catch {
+      /* ignore parse errors; the field guides format */
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl text-ivory">{props.tableName}</h1>
+          <p className="text-xs text-ash">
+            {table
+              ? `${formatAmount(props.asset, BigInt(table.smallBlind))} / ${formatAmount(
+                  props.asset,
+                  BigInt(table.bigBlind),
+                )} ${props.asset} · ${table.status}`
+              : state.connected
+                ? "Loading table…"
+                : "Connecting…"}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`h-2 w-2 rounded-full ${
+              state.connected ? "bg-emerald-400" : "bg-amber-400 animate-pulse-soft"
+            }`}
+          />
+          <VerifyHandDrawer handId={table?.handId ?? null} />
+          {seated && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => send({ t: "LEAVE_TABLE", tableId: props.tableId })}
+            >
+              Leave
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Felt */}
+      <div className="relative overflow-hidden rounded-[2.5rem] border border-felt-light/30 bg-felt-radial p-8 shadow-elevated">
+        <div className="flex min-h-[180px] flex-col items-center justify-center gap-4">
+          <div className="flex items-center gap-3">
+            {table && table.community.length > 0 ? (
+              table.community.map((c) => (
+                <Card3D key={c} card={c} size="lg" />
+              ))
+            ) : (
+              <p className="text-sm text-ivory/50">
+                {table?.handId ? "Awaiting the flop" : "Waiting for the next hand"}
+              </p>
+            )}
+          </div>
+          {table && (
+            <div className="rounded-full border border-gold/30 bg-charcoal-900/40 px-4 py-1.5">
+              <span className="text-xs text-ash">Pot </span>
+              <span className="font-mono text-gold">
+                {formatAmount(props.asset, BigInt(table.totalPot))} {props.asset}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Seats */}
+        <div className="mt-8 flex flex-wrap items-stretch justify-center gap-3">
+          {table?.seats.map((s) => (
+            <Seat
+              key={s.seat}
+              seat={s}
+              asset={props.asset}
+              isDealer={table.dealerSeat === s.seat}
+              isToAct={table.toActSeat === s.seat}
+              isYou={s.playerId === props.youUserId}
+              holeCards={s.playerId === props.youUserId ? state.holeCards : null}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Your hand — the one place we lean into the 3D card for emphasis. */}
+      {seated && state.holeCards && state.holeCards.length > 0 && (
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-eyebrow">Your hand</p>
+          <div className="flex items-end gap-4">
+            {state.holeCards.map((c) => (
+              <Card3D key={c} card={c} size="lg" tilt />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Showdown summary */}
+      {state.lastShowdown && (
+        <div className="card-surface p-4">
+          <p className="mb-2 text-xs text-ash">Showdown</p>
+          <ul className="space-y-1 text-sm">
+            {state.lastShowdown.results
+              .filter((r) => BigInt(r.amountWon) > 0n)
+              .map((r) => (
+                <li key={r.seat} className="text-ivory">
+                  Seat {r.seat + 1} wins {formatAmount(props.asset, BigInt(r.amountWon))}{" "}
+                  {props.asset} — {r.handDescription}
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Action / buy-in */}
+      {!seated ? (
+        <BuyInPanel
+          asset={props.asset}
+          minBuyIn={BigInt(props.minBuyIn)}
+          maxBuyIn={BigInt(props.maxBuyIn)}
+          onBuyIn={buyIn}
+        />
+      ) : isYourTurn && table ? (
+        <ActionBar
+          asset={props.asset}
+          toCall={state.toCall}
+          minRaiseTo={state.minRaiseTo}
+          currentBet={BigInt(table.currentBet)}
+          yourStack={BigInt(yourSeat!.stack)}
+          yourCommitted={BigInt(yourSeat!.committedThisStreet)}
+          onAction={act}
+        />
+      ) : (
+        <p className="text-center text-sm text-ash">
+          {table?.toActSeat != null
+            ? `Waiting on seat ${table.toActSeat + 1}…`
+            : "Waiting for the next hand…"}
+        </p>
+      )}
+
+      {state.error && (
+        <p className="text-center text-sm text-red-300">{state.error}</p>
+      )}
+
+      {/* Chat */}
+      <div className="card-surface p-4">
+        <div className="mb-3 max-h-32 space-y-1 overflow-y-auto text-sm">
+          {state.chat.length === 0 ? (
+            <p className="text-xs text-ash/60">Table chat</p>
+          ) : (
+            state.chat.map((m, i) => (
+              <p key={i} className="text-ash">
+                <span className="text-ivory">{m.from}:</span> {m.message}
+              </p>
+            ))
+          )}
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!chatInput.trim()) return;
+            send({ t: "SEND_CHAT", tableId: props.tableId, message: chatInput });
+            setChatInput("");
+          }}
+          className="flex gap-2"
+        >
+          <input
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            placeholder="Say something…"
+            className="h-9 flex-1 rounded-lg border border-white/10 bg-charcoal-900/60 px-3 text-sm text-ivory placeholder:text-ash/50 focus:outline-none"
+          />
+          <Button size="sm" variant="secondary" type="submit">
+            Send
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}

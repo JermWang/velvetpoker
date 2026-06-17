@@ -1,0 +1,97 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { getCurrentUser } from "@/lib/auth/require-user";
+import { prisma } from "@/lib/db/prisma";
+import { parseAmount } from "@/lib/ledger/money";
+import { generateInviteCode, hashPassword } from "@/lib/crypto";
+import { writeAuditLog } from "@/lib/auth/audit";
+
+const createSchema = z.object({
+  name: z.string().min(2).max(40),
+  asset: z.enum(["SOL", "USDC"]),
+  maxSeats: z.union([z.literal(2), z.literal(6), z.literal(9)]),
+  smallBlind: z.string(),
+  bigBlind: z.string(),
+  minBuyIn: z.string(),
+  maxBuyIn: z.string(),
+  visibility: z.enum(["PUBLIC", "PRIVATE"]),
+  password: z.string().max(64).optional(),
+  actionTimeoutSeconds: z.number().int().min(10).max(120).default(30),
+  spectatorsAllowed: z.boolean().default(true),
+});
+
+export async function POST(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = createSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid input", details: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+  const c = parsed.data;
+
+  try {
+    const asset = c.asset;
+    const smallBlind = parseAmount(asset, c.smallBlind);
+    const bigBlind = parseAmount(asset, c.bigBlind);
+    const minBuyIn = parseAmount(asset, c.minBuyIn);
+    const maxBuyIn = parseAmount(asset, c.maxBuyIn);
+
+    if (bigBlind <= smallBlind) {
+      return NextResponse.json(
+        { error: "Big blind must exceed small blind" },
+        { status: 400 },
+      );
+    }
+    if (maxBuyIn < minBuyIn) {
+      return NextResponse.json(
+        { error: "Max buy-in must be at least the min buy-in" },
+        { status: 400 },
+      );
+    }
+
+    const table = await prisma.pokerTable.create({
+      data: {
+        hostUserId: user.id,
+        name: c.name,
+        asset,
+        smallBlind,
+        bigBlind,
+        minBuyIn,
+        maxBuyIn,
+        maxSeats: c.maxSeats,
+        visibility: c.visibility,
+        passwordHash: c.password ? hashPassword(c.password) : null,
+        inviteCode: generateInviteCode(),
+        actionTimeoutSeconds: c.actionTimeoutSeconds,
+        spectatorsAllowed: c.spectatorsAllowed,
+        status: "WAITING",
+      },
+    });
+
+    await writeAuditLog({
+      actorUserId: user.id,
+      action: "TABLE_CREATED",
+      targetType: "PokerTable",
+      targetId: table.id,
+      metadata: { name: table.name, asset },
+    });
+
+    return NextResponse.json({ id: table.id, inviteCode: table.inviteCode });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to create table" },
+      { status: 400 },
+    );
+  }
+}

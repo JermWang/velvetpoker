@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+@keyframes vp-float { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-12px) } }
+</style>
+</helmet>
+<div ref="{{ rootRef }}" style="display:grid;place-items:center;width:100%;height:100%;perspective:1100px;">
+  <div style="position:relative;transform-style:preserve-3d;animation:{{ floatAnim }};">
+    <div style="position:absolute;inset:-32%;border-radius:50%;background:radial-gradient(closest-side, rgba(200,169,106,0.40), rgba(200,169,106,0.06) 55%, transparent 72%);opacity:{{ glowOpacity }};filter:blur(6px);transition:opacity .45s ease;transform:translateZ(-8px);"></div>
+    <div ref="{{ cardRef }}" style="position:relative;width:{{ w }}px;height:{{ h }}px;transform-style:preserve-3d;will-change:transform;">
+
+      <div style="position:absolute;inset:0;border-radius:{{ r }}px;backface-visibility:hidden;transform:{{ backTransform }};overflow:hidden;background:#13151a;box-shadow:inset 0 0 0 1px rgba(200,169,106,0.32), inset 0 0 0 4px rgba(15,17,21,1), inset 0 0 0 5px rgba(200,169,106,0.18);">
+        <div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg, rgba(200,169,106,0.13) 0 1px, transparent 1px 8px), repeating-linear-gradient(-45deg, rgba(200,169,106,0.13) 0 1px, transparent 1px 8px);"></div>
+        <div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 50%, rgba(200,169,106,0.10), transparent 58%);"></div>
+        <div style="position:absolute;inset:0;display:grid;place-items:center;">
+          <div style="display:grid;place-items:center;width:{{ crest }}px;height:{{ crest }}px;border-radius:{{ crestR }}px;border:1px solid rgba(200,169,106,0.45);background:rgba(200,169,106,0.06);box-shadow:0 0 0 4px rgba(19,21,26,0.85), 0 0 0 5px rgba(200,169,106,0.20);font-family:'Cormorant Garamond',Georgia,serif;color:#c8a96a;font-size:{{ crestFont }}px;font-weight:600;line-height:1;">V</div>
+        </div>
+      </div>
+
+      <sc-for list="{{ layers }}" as="ly" hint-placeholder-count="12">
+        <div style="position:absolute;inset:0;border-radius:{{ r }}px;transform:{{ ly.tf }};background:linear-gradient(170deg, #ead4a0 0%, #c8a96a 42%, #9c8049 100%);"></div>
+      </sc-for>
+
+      <div style="position:absolute;inset:0;border-radius:{{ r }}px;backface-visibility:hidden;transform:{{ frontTransform }};overflow:hidden;background:radial-gradient(125% 120% at 50% -8%, #faf8f1 0%, #f2eee2 70%, #e9e3d3 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,0.65), inset 0 -14px 26px rgba(120,100,60,0.07), inset 0 0 0 1px rgba(120,100,60,0.10);font-family:'Cormorant Garamond',Georgia,serif;">
+        <div style="position:absolute;top:{{ pad }}px;left:{{ padX }}px;display:flex;flex-direction:column;align-items:center;line-height:0.82;color:{{ suitColor }};">
+          <span style="font-size:{{ rankSize }}px;font-weight:600;letter-spacing:-0.02em;">{{ rankText }}</span>
+          <span style="font-size:{{ cornerSize }}px;line-height:1;">{{ suitSym }}</span>
+        </div>
+        <div style="position:absolute;inset:0;display:grid;place-items:center;color:{{ suitColor }};font-size:{{ pipSize }}px;line-height:1;text-shadow:0 1px 1px rgba(120,100,60,0.18);">{{ suitSym }}</div>
+        <div style="position:absolute;bottom:{{ pad }}px;right:{{ padX }}px;display:flex;flex-direction:column;align-items:center;line-height:0.82;color:{{ suitColor }};transform:rotate(180deg);">
+          <span style="font-size:{{ rankSize }}px;font-weight:600;letter-spacing:-0.02em;">{{ rankText }}</span>
+          <span style="font-size:{{ cornerSize }}px;line-height:1;">{{ suitSym }}</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:320,&quot;height&quot;:380},&quot;rank&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;A&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;suit&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;s&quot;,&quot;h&quot;,&quot;d&quot;,&quot;c&quot;],&quot;default&quot;:&quot;s&quot;,&quot;tsType&quot;:&quot;\&quot;s\&quot;|\&quot;h\&quot;|\&quot;d\&quot;|\&quot;c\&quot;&quot;},&quot;faceDown&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;sm&quot;,&quot;md&quot;,&quot;lg&quot;,&quot;hero&quot;],&quot;default&quot;:&quot;lg&quot;,&quot;tsType&quot;:&quot;\&quot;sm\&quot;|\&quot;md\&quot;|\&quot;lg\&quot;|\&quot;hero\&quot;&quot;},&quot;tilt&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;float&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;glow&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this._card = null;
+    this._root = null;
+    this.tiltX = 0;
+    this.tiltY = 0;
+    this.maxTilt = 1;
+
+    this.rootRef = (el) => {
+      if (!el || el.__vpBound) { this._root = el || this._root; return; }
+      this._root = el;
+      el.__vpBound = true;
+      const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      el.addEventListener("pointermove", (e) => {
+        if (this.props.tilt === false || reduce) return;
+        const r = el.getBoundingClientRect();
+        this.tiltY = ((e.clientX - r.left) / r.width - 0.5) * 26;
+        this.tiltX = -((e.clientY - r.top) / r.height - 0.5) * 20;
+        if (this._card) this._card.style.transition = "transform 0.08s linear";
+        this.apply();
+      });
+      el.addEventListener("pointerleave", () => {
+        this.tiltX = 0; this.tiltY = 0;
+        if (this._card) this._card.style.transition = "transform 0.62s cubic-bezier(.2,.75,.2,1)";
+        this.apply();
+      });
+    };
+
+    this.cardRef = (el) => {
+      this._card = el;
+      if (el) {
+        el.style.transition = "transform 0.62s cubic-bezier(.2,.75,.2,1)";
+        this.apply();
+      }
+    };
+  }
+
+  apply() {
+    const c = this._card;
+    if (!c) return;
+    const baseY = this.props.faceDown ? 180 : 0;
+    c.style.transform =
+      `rotateY(${(baseY + this.tiltY).toFixed(2)}deg) rotateX(${this.tiltX.toFixed(2)}deg)`;
+  }
+
+  renderVals() {
+    const p = this.props;
+    // keep imperative transform in sync with prop-driven flip on each render
+    if (typeof requestAnimationFrame !== "undefined") requestAnimationFrame(() => this.apply());
+
+    const sizeKey = p.size || "lg";
+    const SIZES = {
+      sm:   { w: 50,  h: 70,  r: 5,  t: 4, rank: 14, pip: 20, corner: 11, pad: 4,  padX: 5,  crest: 22, crestF: 13 },
+      md:   { w: 66,  h: 92,  r: 7,  t: 5, rank: 18, pip: 28, corner: 13, pad: 6,  padX: 7,  crest: 30, crestF: 17 },
+      lg:   { w: 98,  h: 137, r: 9,  t: 6, rank: 26, pip: 44, corner: 18, pad: 8,  padX: 9,  crest: 42, crestF: 25 },
+      hero: { w: 152, h: 214, r: 13, t: 9, rank: 40, pip: 70, corner: 27, pad: 12, padX: 14, crest: 64, crestF: 38 },
+    };
+    const S = SIZES[sizeKey] || SIZES.lg;
+
+    const suit = p.suit || "s";
+    const SYM = { s: "\u2660", h: "\u2665", d: "\u2666", c: "\u2663" };
+    const red = suit === "h" || suit === "d";
+    const suitColor = red ? "#b23b3b" : "#1a1c20";
+    const rankText = p.rank == null ? "A" : String(p.rank);
+
+    const half = S.t / 2;
+    const n = Math.max(7, Math.round(S.t * 2.4));
+    const layers = [];
+    for (let i = 0; i < n; i++) {
+      const z = -half + 0.5 + (i / (n - 1)) * (S.t - 1);
+      layers.push({ tf: `translateZ(${z.toFixed(2)}px)` });
+    }
+
+    return {
+      rootRef: this.rootRef,
+      cardRef: this.cardRef,
+      w: S.w, h: S.h, r: S.r,
+      rankSize: S.rank, pipSize: S.pip, cornerSize: S.corner,
+      pad: S.pad, padX: S.padX,
+      crest: S.crest, crestR: Math.round(S.crest * 0.22), crestFont: S.crestF,
+      suitSym: SYM[suit], suitColor, rankText,
+      layers,
+      frontTransform: `translateZ(${half.toFixed(2)}px)`,
+      backTransform: `rotateY(180deg) translateZ(${half.toFixed(2)}px)`,
+      floatAnim: p.float ? "vp-float 6.5s ease-in-out infinite" : "none",
+      glowOpacity: p.glow ? 1 : 0,
+    };
+  }
+}
+</script>
+</body>
+</html>
