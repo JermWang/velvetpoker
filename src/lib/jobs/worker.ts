@@ -14,6 +14,7 @@ import { env } from "@/lib/env";
 import { runDepositMonitorLoop } from "./deposit-monitor";
 import { runWithdrawalProcessorLoop } from "./withdrawal-processor";
 import { runReconciliationOnce } from "./reconciliation";
+import { runAnchorLoop } from "./anchor";
 
 async function runReconciliationLoop(intervalMs = 5 * 60_000): Promise<void> {
   // eslint-disable-next-line no-constant-condition
@@ -39,17 +40,27 @@ export function startBackgroundWorkers(): void {
   console.log(
     `[worker] starting (network=${env.solanaNetwork}, on-chain=${onChain ? "live" : "mock"})`,
   );
+
+  // Reconciliation is pure DB integrity checking — always safe to run.
+  void runReconciliationLoop().catch((e) => console.error("[reconciliation] fatal", e));
+
+  // The chain-writing loops (deposit detection, withdrawal sending, outcome
+  // anchoring) only run once a real hot wallet + treasury are configured. In
+  // mock mode they would write fake signatures / fake anchors into the live DB,
+  // so we keep them idle until on-chain is genuinely enabled. Completed hands
+  // simply accumulate as unanchored and get anchored on-chain once live.
   if (!onChain) {
     console.warn(
-      "[worker] HOT_WALLET_PRIVATE_KEY and/or TREASURY_WALLET_ADDRESS not set — running with the mock Solana provider. Deposits/withdrawals will not touch mainnet until both are configured.",
+      "[worker] on-chain workers idle — set HOT_WALLET_PRIVATE_KEY (+ TREASURY_WALLET_ADDRESS) to enable deposits, withdrawals, and outcome anchoring on mainnet.",
     );
+    return;
   }
 
-  // Fire all loops; they never resolve. Any unexpected rejection is logged but
-  // must not take the whole process down silently.
   void runDepositMonitorLoop().catch((e) => console.error("[deposit-monitor] fatal", e));
   void runWithdrawalProcessorLoop().catch((e) => console.error("[withdrawal-processor] fatal", e));
-  void runReconciliationLoop().catch((e) => console.error("[reconciliation] fatal", e));
+  if (env.anchorEnabled) {
+    void runAnchorLoop().catch((e) => console.error("[anchor] fatal", e));
+  }
 }
 
 // Allow running as a standalone worker service: `tsx src/lib/jobs/worker.ts`.

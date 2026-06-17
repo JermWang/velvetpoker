@@ -49,4 +49,10 @@ export class MockSolanaProvider implements SolanaProvider {
     this.confirmations.set(sig, 64);
     return { txSignature: sig };
   }
+
+  async postMemo(_memo: string): Promise<SendResult> {
+    const sig = `mock_memo_${randomBytes(8).toString("hex")}`;
+    this.confirmations.set(sig, 64);
+    return { txSignature: sig };
+  }
 }

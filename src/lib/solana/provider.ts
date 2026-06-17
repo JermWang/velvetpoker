@@ -39,4 +39,9 @@ export interface SolanaProvider {
     /** Idempotency key so a retried withdrawal is never double-sent. */
     idempotencyKey: string;
   }): Promise<SendResult>;
+  /**
+   * Post a memo transaction signed by the hot wallet (used to anchor outcome
+   * Merkle roots on-chain). SERVER ONLY.
+   */
+  postMemo(memo: string): Promise<SendResult>;
 }

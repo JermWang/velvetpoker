@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { verifyShuffleProof, ALGORITHM } from "@/lib/poker/rng";
+import { buildHandAnchorProof } from "@/lib/jobs/anchor";
 
 /**
  * Returns the verifiable-shuffle proof for a completed hand and a server-side
- * recomputation result. Clients may also independently recompute the deck using
- * the documented algorithm (see /legal/rules) to confirm fairness.
+ * recomputation result, plus the on-chain outcome anchor (Merkle proof + the
+ * memo tx that commits the batch root) when the hand has been anchored. Clients
+ * may independently recompute the deck (see /legal/rules) AND fold the Merkle
+ * proof to confirm the outcome matches what was posted on-chain.
  */
 export async function GET(
   _req: Request,
@@ -33,6 +36,7 @@ export async function GET(
   };
 
   const result = verifyShuffleProof(proof);
+  const anchor = await buildHandAnchorProof(hand.id);
 
-  return NextResponse.json({ proof, result });
+  return NextResponse.json({ proof, result, anchor });
 }

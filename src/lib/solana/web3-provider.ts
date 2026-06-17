@@ -17,6 +17,7 @@ import {
   PublicKey,
   SystemProgram,
   Transaction,
+  TransactionInstruction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import {
@@ -38,6 +39,10 @@ import type {
 const FINALIZED = 1_000_000;
 /** How many recent signatures to scan per address per poll. */
 const SIGNATURE_SCAN_LIMIT = 40;
+/** SPL Memo program (v2). */
+const MEMO_PROGRAM_ID = new PublicKey(
+  "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+);
 
 export class Web3SolanaProvider implements SolanaProvider {
   readonly name = "web3";
@@ -181,6 +186,28 @@ export class Web3SolanaProvider implements SolanaProvider {
         TOKEN_PROGRAM_ID,
       ),
     );
+    const sig = await sendAndConfirmTransaction(this.connection, tx, [
+      this.hotWallet,
+    ]);
+    return { txSignature: sig };
+  }
+
+  async postMemo(memo: string): Promise<SendResult> {
+    if (!this.hotWallet) {
+      throw new Error("Hot wallet is not configured (HOT_WALLET_PRIVATE_KEY)");
+    }
+    const ix = new TransactionInstruction({
+      keys: [
+        {
+          pubkey: this.hotWallet.publicKey,
+          isSigner: true,
+          isWritable: false,
+        },
+      ],
+      programId: MEMO_PROGRAM_ID,
+      data: Buffer.from(memo, "utf8"),
+    });
+    const tx = new Transaction().add(ix);
     const sig = await sendAndConfirmTransaction(this.connection, tx, [
       this.hotWallet,
     ]);

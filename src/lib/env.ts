@@ -53,6 +53,16 @@ export const env = {
   depositConfirmations: Number(optional("DEPOSIT_CONFIRMATIONS") ?? "32"),
   wsPort: Number(optional("WS_PORT") ?? "3001"),
   isProduction: process.env.NODE_ENV === "production",
+
+  // Outcome anchoring. Hands are batched into a Merkle root and posted on-chain
+  // in one memo tx. Anchor when a batch reaches minBatch, OR when the oldest
+  // unanchored hand exceeds maxAge (so low-traffic tables still anchor in
+  // bounded time). Set ANCHOR_ENABLED=false to disable.
+  anchorEnabled: optional("ANCHOR_ENABLED") !== "false",
+  anchorMinBatch: Number(optional("ANCHOR_MIN_BATCH") ?? "10"),
+  anchorMaxBatch: Number(optional("ANCHOR_MAX_BATCH") ?? "200"),
+  anchorMaxAgeMs: Number(optional("ANCHOR_MAX_AGE_MS") ?? "600000"),
+  anchorIntervalMs: Number(optional("ANCHOR_INTERVAL_MS") ?? "60000"),
 };
 
 export function isAdminEmail(email: string | null | undefined): boolean {

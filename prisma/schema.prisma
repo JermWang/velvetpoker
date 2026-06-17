@@ -384,15 +384,47 @@ model Hand {
   deckHash       String
   startedAt      DateTime   @default(now())
   completedAt    DateTime?
+  anchorId       String?
 
   table   PokerTable   @relation(fields: [tableId], references: [id], onDelete: Cascade)
   actions HandAction[]
   results HandResult[]
   rngProof RngProof?
+  anchor  HandAnchor?  @relation(fields: [anchorId], references: [id], onDelete: SetNull)
 
   @@unique([tableId, handNumber])
   @@index([tableId])
   @@index([status])
+  // Fast scan for completed-but-unanchored hands.
+  @@index([status, anchorId])
+  @@index([anchorId])
+}
+
+/// A batched on-chain anchor of hand outcomes. Many completed hands are hashed
+/// into a Merkle tree and the root is posted on-chain in a single memo tx, so
+/// outcomes/payouts are tamper-evident without publishing per-hand data. The
+/// verify endpoint recomputes a hand's leaf + Merkle proof against this root.
+model HandAnchor {
+  id          String       @id @default(cuid())
+  merkleRoot  String       // hex sha256 Merkle root over the batch's hand leaves
+  algorithm   String       @default("velvet-anchor-merkle-sha256-v1")
+  handCount   Int
+  chain       Chain        @default(SOLANA)
+  txSignature String?      @unique
+  slot        BigInt?
+  status      AnchorStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  confirmedAt DateTime?
+
+  hands Hand[]
+
+  @@index([status])
+}
+
+enum AnchorStatus {
+  PENDING
+  CONFIRMED
+  FAILED
 }
 
 model HandAction {
