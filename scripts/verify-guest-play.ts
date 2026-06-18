@@ -95,6 +95,19 @@ async function main() {
   assert(sawEvent(g1, "PRIVATE_CARDS"), "guest 1 received their hole cards");
   assert(sawEvent(g2, "PRIVATE_CARDS"), "guest 2 received their hole cards");
 
+  // Opaque seat tokens (#3): the client gets an IDENTITY token, can match its
+  // own seat by it, and the raw user id is NEVER broadcast in table state.
+  const idEv = g1.events.find((e) => e.t === "IDENTITY") as { playerToken?: string } | undefined;
+  assert(idEv && typeof idEv.playerToken === "string", "guest received an opaque IDENTITY token");
+  const g1Token = idEv!.playerToken!;
+  const latest = [...g1.events].reverse().find((e) => e.t === "TABLE_STATE") as
+    | { state?: { seats: { playerId: string | null }[] } }
+    | undefined;
+  const seats = latest?.state?.seats ?? [];
+  assert(seats.some((s) => s.playerId === g1Token), "guest can match its own seat by the opaque token");
+  assert(g1Token !== "guest:gtest0001", "the seat token is not the raw user id");
+  assert(!seats.some((s) => s.playerId === "guest:gtest0001" || s.playerId === "guest:gtest0002"), "raw user ids are NOT broadcast in table state");
+
   // Auto-pilot drives the hand; wait for a showdown / completion.
   for (let i = 0; i < 60 && !(sawEvent(g1, "SHOWDOWN") || sawEvent(g1, "HAND_COMPLETE") || sawEvent(g2, "SHOWDOWN") || sawEvent(g2, "HAND_COMPLETE")); i++) {
     await sleep(250);

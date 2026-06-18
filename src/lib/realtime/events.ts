@@ -68,6 +68,9 @@ export interface WireTableState {
 export type ServerEvent =
   | { t: "TABLE_STATE"; state: WireTableState }
   | { t: "SEAT_UPDATE"; tableId: string; seats: WireSeat[] }
+  // Tells the connected player their own opaque seat token for this table, so
+  // they can identify their seat without real user ids being broadcast.
+  | { t: "IDENTITY"; tableId: string; playerToken: string }
   | {
       t: "HAND_STARTED";
       tableId: string;

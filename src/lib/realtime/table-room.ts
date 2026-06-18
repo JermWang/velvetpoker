@@ -28,6 +28,7 @@ import {
   shuffleDeckFromSeed,
   ALGORITHM,
 } from "@/lib/poker/rng";
+import { randomBytes } from "node:crypto";
 import type { ActionType, Card } from "@/lib/poker/types";
 import { computeRake } from "@/lib/poker/rake";
 import type { ServerEvent, WireSeat, WireTableState } from "./events";
@@ -105,6 +106,9 @@ export class TableRoom {
   readonly config: RoomConfig;
   private seats = new Map<number, RoomSeat>();
   private clientSeeds = new Map<string, string>(); // playerId -> seed for next hand
+  // Per-table opaque seat tokens so real user ids are never broadcast. Maps the
+  // real playerId -> a random token used as the public WireSeat.playerId.
+  private seatTokens = new Map<string, string>();
   private hand: HandState | null = null;
   private handNumber = 0;
   private dealerSeat = 0;
@@ -150,6 +154,21 @@ export class TableRoom {
   /** Whether this player already occupies a seat at the table. */
   hasPlayer(playerId: string): boolean {
     return !!this.findSeatByPlayer(playerId);
+  }
+
+  /** Stable per-table opaque token for a player (the public seat identifier). */
+  private tokenFor(playerId: string): string {
+    let token = this.seatTokens.get(playerId);
+    if (!token) {
+      token = randomBytes(9).toString("base64url");
+      this.seatTokens.set(playerId, token);
+    }
+    return token;
+  }
+
+  /** The opaque token to hand a player so they can recognize their own seat. */
+  identityToken(playerId: string): string {
+    return this.tokenFor(playerId);
   }
 
   /**
@@ -449,7 +468,7 @@ export class TableRoom {
         handId: hand.handId,
         results: pub.results.map((r) => ({
           seat: r.seat,
-          playerId: r.playerId,
+          playerId: this.tokenFor(r.playerId),
           amountWon: r.amountWon.toString(),
           handDescription: r.handDescription,
           cards: r.cards,
@@ -575,7 +594,8 @@ export class TableRoom {
         const es = this.hand?.seats.find((x) => x.playerId === s.playerId);
         return {
           seat: s.seatNumber,
-          playerId: s.playerId,
+          // Opaque per-table token, never the real user id (privacy).
+          playerId: this.tokenFor(s.playerId),
           displayName: s.displayName,
           stack: (es?.stack ?? s.stack).toString(),
           committedThisStreet: (es?.committedThisStreet ?? 0n).toString(),

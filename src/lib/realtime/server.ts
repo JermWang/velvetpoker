@@ -194,6 +194,13 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
       client.tableId = event.tableId;
       entry.clients.add(client);
       room.setConnected(userId, true);
+      // Tell the client its opaque seat token so it can recognize its own seat
+      // (the wire never carries real user ids).
+      sendTo(client, {
+        t: "IDENTITY",
+        tableId: event.tableId,
+        playerToken: room.identityToken(userId),
+      });
       room.sendTableState(userId);
       break;
     }

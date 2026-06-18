@@ -37,13 +37,6 @@ export function PokerTableView(props: PokerTableViewProps) {
       ? `g${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`
       : null,
   );
-  // The server namespaces guest ids as `guest:<id>`; match that for seat/
-  // hole-card identification. The query param carries the raw id.
-  const youUserId = props.guestMode
-    ? guestId
-      ? `guest:${guestId}`
-      : null
-    : props.youUserId;
   const authQuery =
     props.guestMode && guestId ? `guest=${guestId}` : props.authQuery;
 
@@ -54,14 +47,17 @@ export function PokerTableView(props: PokerTableViewProps) {
   });
   const [chatInput, setChatInput] = useState("");
 
-  const isSpectator = youUserId == null;
+  // Spectator status is fixed by the connection mode; seat identity comes from
+  // the opaque per-table token the server sends (real ids are never broadcast).
+  const isSpectator = !props.guestMode && props.youUserId == null;
+  const youToken = state.playerToken;
   const table = state.table;
   const yourSeat = useMemo(
     () =>
-      youUserId == null
+      youToken == null
         ? null
-        : (table?.seats.find((s) => s.playerId === youUserId) ?? null),
-    [table, youUserId],
+        : (table?.seats.find((s) => s.playerId === youToken) ?? null),
+    [table, youToken],
   );
   const seated = !!yourSeat;
   const isYourTurn =
@@ -167,8 +163,8 @@ export function PokerTableView(props: PokerTableViewProps) {
               asset={props.asset}
               isDealer={table.dealerSeat === s.seat}
               isToAct={table.toActSeat === s.seat}
-              isYou={s.playerId === youUserId}
-              holeCards={s.playerId === youUserId ? state.holeCards : null}
+              isYou={s.playerId === youToken}
+              holeCards={s.playerId === youToken ? state.holeCards : null}
             />
           ))}
         </div>

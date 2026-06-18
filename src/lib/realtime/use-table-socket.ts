@@ -7,6 +7,8 @@ import type { ClientEvent, ServerEvent, WireTableState } from "./events";
 export interface TableSocketState {
   connected: boolean;
   table: WireTableState | null;
+  /** This client's opaque seat token (from the IDENTITY event), for self-match. */
+  playerToken: string | null;
   holeCards: Card[] | null;
   /** seat -> action deadline ms, set when it's that seat's turn to act. */
   actionDeadline: number | null;
@@ -30,6 +32,7 @@ export function useTableSocket({ wsUrl, tableId, authQuery }: UseTableSocketArgs
   const [state, setState] = useState<TableSocketState>({
     connected: false,
     table: null,
+    playerToken: null,
     holeCards: null,
     actionDeadline: null,
     yourTurnSeat: null,
@@ -75,6 +78,8 @@ export function useTableSocket({ wsUrl, tableId, authQuery }: UseTableSocketArgs
 
 function reduce(s: TableSocketState, e: ServerEvent): TableSocketState {
   switch (e.t) {
+    case "IDENTITY":
+      return { ...s, playerToken: e.playerToken };
     case "TABLE_STATE":
       return { ...s, table: e.state, error: null };
     case "SEAT_UPDATE":
