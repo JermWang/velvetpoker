@@ -31,6 +31,7 @@ import {
 import { randomBytes } from "node:crypto";
 import type { ActionType, Card } from "@/lib/poker/types";
 import { computeRake } from "@/lib/poker/rake";
+import { decideBotAction, isBotId, BOT_ID_PREFIX } from "@/lib/poker/bot";
 import type { ServerEvent, WireSeat, WireTableState } from "./events";
 
 export interface RoomConfig {
@@ -42,6 +43,8 @@ export interface RoomConfig {
   maxSeats: number;
   actionTimeoutSeconds: number;
   rakeBps?: number;
+  /** Free-play demo table — fills empty seats with heuristic bots. */
+  isDemo?: boolean;
 }
 
 interface RoomSeat {
@@ -102,6 +105,18 @@ export interface HandCompletedInfo {
 type SendFn = (playerId: string, event: ServerEvent) => void;
 type BroadcastFn = (event: ServerEvent) => void;
 
+// Display names for free-play bots.
+const BOT_NAMES = [
+  "Ace",
+  "Banker",
+  "Calliope",
+  "Diesel",
+  "Echo",
+  "Faye",
+  "Goldie",
+  "Hex",
+];
+
 export class TableRoom {
   readonly config: RoomConfig;
   private seats = new Map<number, RoomSeat>();
@@ -109,6 +124,8 @@ export class TableRoom {
   // Per-table opaque seat tokens so real user ids are never broadcast. Maps the
   // real playerId -> a random token used as the public WireSeat.playerId.
   private seatTokens = new Map<string, string>();
+  private botCounter = 0;
+  private botTimer: ReturnType<typeof setTimeout> | null = null;
   private hand: HandState | null = null;
   private handNumber = 0;
   private dealerSeat = 0;
@@ -237,6 +254,8 @@ export class TableRoom {
     const returned = seat.stack;
     this.seats.delete(seat.seatNumber);
     this.broadcastSeats();
+    // Demo tables: clear the bots once the last human leaves.
+    this.manageBots();
     return returned;
   }
 
@@ -260,9 +279,111 @@ export class TableRoom {
 
   private maybeStartHand(): void {
     if (this.hand && !this.hand.isComplete) return;
+    this.manageBots();
     const players = this.eligiblePlayers();
     if (players.length < 2) return;
+    // Demo tables only deal when an active human is in: bots never play alone.
+    if (this.config.isDemo && !players.some((p) => !this.isBotSeat(p))) return;
     this.startHand(players);
+  }
+
+  // ---- bots (demo tables only) ------------------------------------------
+
+  /** Target seated players to keep a free-play table lively for a lone human. */
+  private static readonly DEMO_TARGET_PLAYERS = 3;
+
+  private isBotSeat(s: RoomSeat): boolean {
+    return isBotId(s.playerId);
+  }
+
+  private humanCount(): number {
+    return [...this.seats.values()].filter((s) => !this.isBotSeat(s)).length;
+  }
+
+  /**
+   * Keep demo tables populated with bots: remove all bots when no human is
+   * present (so the table idles), otherwise top up to a small target. Only
+   * mutates between hands.
+   */
+  private manageBots(): void {
+    if (!this.config.isDemo) return;
+    if (this.hand && !this.hand.isComplete) return;
+
+    let changed = false;
+
+    // Remove all bots when no human is present; otherwise prune busted/sitting-
+    // out bots so the table stays fresh.
+    const noHumans = this.humanCount() === 0;
+    for (const [n, s] of this.seats) {
+      if (!this.isBotSeat(s)) continue;
+      if (noHumans || s.stack === 0n || s.sittingOut) {
+        this.seats.delete(n);
+        this.seatTokens.delete(s.playerId);
+        changed = true;
+      }
+    }
+
+    if (!noHumans) {
+      const target = Math.min(TableRoom.DEMO_TARGET_PLAYERS, this.config.maxSeats);
+      while (this.seats.size < target && this.seats.size < this.config.maxSeats) {
+        if (!this.addBot()) break;
+        changed = true;
+      }
+    }
+
+    if (changed) this.broadcastSeats();
+  }
+
+  private addBot(): boolean {
+    let seatNumber = -1;
+    for (let i = 0; i < this.config.maxSeats; i++) {
+      if (!this.seats.has(i)) {
+        seatNumber = i;
+        break;
+      }
+    }
+    if (seatNumber < 0) return false;
+    this.botCounter += 1;
+    // Stack between ~80 and ~200 big blinds for variety.
+    const bb = this.config.bigBlind;
+    const stack = bb * BigInt(80 + Math.floor(Math.random() * 121));
+    this.seats.set(seatNumber, {
+      seatNumber,
+      playerId: `${BOT_ID_PREFIX}${this.botCounter}`,
+      displayName: BOT_NAMES[(this.botCounter - 1) % BOT_NAMES.length]!,
+      stack,
+      sittingOut: false,
+      connected: true,
+    });
+    return true;
+  }
+
+  /** A bot takes its turn (called on a delay so it feels human). */
+  private botAct(seatNumber: number): void {
+    if (!this.hand || this.hand.isComplete) return;
+    if (this.hand.toActSeat !== seatNumber) return;
+    const seat = this.hand.seats.find((s) => s.seat === seatNumber);
+    if (!seat || !isBotId(seat.playerId)) return;
+
+    let decided: ActionType = "CHECK";
+    let amount: bigint | undefined;
+    try {
+      const a = decideBotAction(this.hand, seat);
+      decided = a.type;
+      amount = a.amount ?? undefined;
+    } catch {
+      /* fall through to the safe fallback below */
+    }
+    this.handleAction(seat.playerId, decided, amount);
+
+    // If the decided action was rejected, fall back to a guaranteed-legal move.
+    if (this.hand && !this.hand.isComplete && this.hand.toActSeat === seatNumber) {
+      const toCall = amountToCall(this.hand, seat);
+      this.handleAction(seat.playerId, toCall === 0n ? "CHECK" : "CALL");
+      if (this.hand && !this.hand.isComplete && this.hand.toActSeat === seatNumber) {
+        this.handleAction(seat.playerId, "FOLD");
+      }
+    }
   }
 
   private startHand(players: RoomSeat[]): void {
@@ -428,6 +549,16 @@ export class TableRoom {
     if (!this.hand || this.hand.toActSeat === null) return;
     const seat = this.hand.seats.find((s) => s.seat === this.hand!.toActSeat);
     if (!seat) return;
+
+    // Bots have no client to prompt — they act on a short, human-feeling delay.
+    if (isBotId(seat.playerId)) {
+      const seatNumber = seat.seat;
+      this.botTimer = setTimeout(
+        () => this.botAct(seatNumber),
+        650 + Math.floor(Math.random() * 1100),
+      );
+      return;
+    }
 
     const deadline = Date.now() + this.config.actionTimeoutSeconds * 1000;
     this.actionDeadline = deadline;
@@ -653,6 +784,10 @@ export class TableRoom {
     if (this.actionTimer) {
       clearTimeout(this.actionTimer);
       this.actionTimer = null;
+    }
+    if (this.botTimer) {
+      clearTimeout(this.botTimer);
+      this.botTimer = null;
     }
     this.actionDeadline = null;
   }

@@ -115,6 +115,7 @@ async function createRoom(tableId: string): Promise<RoomEntry | null> {
     actionTimeoutSeconds: table.actionTimeoutSeconds,
     // Demo tables take no rake and never touch the ledger.
     rakeBps: table.isDemo ? 0 : table.rakeBps,
+    isDemo: table.isDemo,
   };
 
   const clients = new Set<Client>();

@@ -28,7 +28,8 @@
     "verify:flow": "tsx --env-file=.env scripts/verify-flow.ts",
     "seed:rooms": "tsx --env-file=.env scripts/seed-house-rooms.ts",
     "verify:rake": "tsx --env-file=.env scripts/verify-rake-referral.ts",
-    "verify:guest": "tsx --env-file=.env scripts/verify-guest-play.ts"
+    "verify:guest": "tsx --env-file=.env scripts/verify-guest-play.ts",
+    "verify:bots": "tsx --env-file=.env scripts/verify-bots.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

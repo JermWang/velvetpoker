@@ -72,10 +72,9 @@ async function main() {
   const g2 = await connectGuest(table.id, "gtest0002");
   await sleep(200);
 
-  // Both buy in (free chips). The server clamps to the table range.
+  // Both buy in (free chips), back-to-back. The server clamps to the table range.
   const buyIn = table.maxBuyIn.toString();
   g1.ws.send(JSON.stringify({ t: "BUY_IN", tableId: table.id, amount: buyIn }));
-  await sleep(300);
   g2.ws.send(JSON.stringify({ t: "BUY_IN", tableId: table.id, amount: buyIn }));
 
   // Wait for a hand to start.
@@ -90,8 +89,12 @@ async function main() {
   if (g2err) console.log("  g2 ERROR:", (g2err as { message?: string }).message);
   assert(sawEvent(g1, "HAND_STARTED") || sawEvent(g2, "HAND_STARTED"), "a hand STARTED with two guests seated");
 
-  // Each guest should have been dealt private cards (matched by their id).
-  await sleep(300);
+  // Each guest should be dealt private cards. Bots fill the free table, and a
+  // guest whose buy-in lands just after the first hand deals is dealt from the
+  // next hand — so wait across a hand or two for BOTH to receive cards.
+  for (let i = 0; i < 80 && !(sawEvent(g1, "PRIVATE_CARDS") && sawEvent(g2, "PRIVATE_CARDS")); i++) {
+    await sleep(250);
+  }
   assert(sawEvent(g1, "PRIVATE_CARDS"), "guest 1 received their hole cards");
   assert(sawEvent(g2, "PRIVATE_CARDS"), "guest 2 received their hole cards");
 
