@@ -10,6 +10,7 @@ import type {
   RiskSeverity,
 } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { sendRiskAlert } from "./alert";
 
 type Tx = Prisma.TransactionClient;
 
@@ -35,4 +36,15 @@ export async function recordRiskEvent(
       metadata: params.metadata as Prisma.InputJsonValue | undefined,
     },
   });
+
+  // Best-effort external alert for serious events. Only when we own the write
+  // (no caller transaction) so we never alert on a row that later rolls back.
+  if (!tx && (params.severity === "HIGH" || params.severity === "CRITICAL")) {
+    sendRiskAlert({
+      type: params.type,
+      severity: params.severity,
+      userId: params.userId,
+      metadata: params.metadata,
+    });
+  }
 }

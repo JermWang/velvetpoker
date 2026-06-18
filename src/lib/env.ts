@@ -50,6 +50,19 @@ export const env = {
   minWithdrawalReviewLamports: BigInt(
     optional("MIN_WITHDRAWAL_REVIEW_LAMPORTS") ?? "1000000000",
   ),
+  // Per-user withdrawal velocity. Exceeding the rolling-24h count OR the
+  // per-asset amount cap forces the request into manual review (it never
+  // hard-blocks the user). Tune for your float; defaults are conservative.
+  withdrawalDailyMaxCount: Number(optional("WITHDRAWAL_DAILY_MAX_COUNT") ?? "20"),
+  withdrawalDailyMaxLamports: BigInt(
+    optional("WITHDRAWAL_DAILY_MAX_LAMPORTS") ?? "10000000000", // 10 SOL
+  ),
+  withdrawalDailyMaxUsdc: BigInt(
+    optional("WITHDRAWAL_DAILY_MAX_USDC") ?? "5000000000", // 5000 USDC (6dp)
+  ),
+  // Optional outbound webhook for HIGH/CRITICAL risk alerts (Slack/Discord/
+  // generic JSON). Unset = alerts are recorded to the DB only.
+  alertWebhookUrl: optional("ALERT_WEBHOOK_URL"),
   depositConfirmations: Number(optional("DEPOSIT_CONFIRMATIONS") ?? "32"),
   wsPort: Number(optional("WS_PORT") ?? "3001"),
   isProduction: process.env.NODE_ENV === "production",

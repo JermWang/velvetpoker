@@ -38,10 +38,45 @@ export async function requestWithdrawal(params: {
 }): Promise<RequestWithdrawalResult> {
   if (params.amount <= 0n) throw new Error("Amount must be positive");
 
-  const requiresReview = aboveReviewThreshold(params.asset, params.amount);
-
   return prisma.$transaction(async (tx) => {
-    // Lock funds first; throws if insufficient available balance.
+    // Double-submit / idempotency guard: refuse a second identical request
+    // while one is still in flight (not yet sent, rejected, or failed).
+    const inflightDuplicate = await tx.withdrawal.findFirst({
+      where: {
+        userId: params.userId,
+        asset: params.asset,
+        amount: params.amount,
+        toAddress: params.toAddress,
+        status: { in: ["REQUESTED", "PENDING_REVIEW", "APPROVED"] },
+      },
+    });
+    if (inflightDuplicate) {
+      throw new Error("An identical withdrawal is already in progress");
+    }
+
+    // Velocity: count + per-asset amount over a rolling window. Exceeding
+    // either forces manual review rather than blocking the user.
+    const since = new Date(Date.now() - VELOCITY_WINDOW_MS);
+    const recent = await tx.withdrawal.findMany({
+      where: {
+        userId: params.userId,
+        createdAt: { gte: since },
+        status: { notIn: ["REJECTED", "FAILED"] },
+      },
+      select: { asset: true, amount: true },
+    });
+    const recentAssetTotal =
+      recent
+        .filter((w) => w.asset === params.asset)
+        .reduce((sum, w) => sum + w.amount, 0n) + params.amount;
+    const overVelocity =
+      recent.length >= env.withdrawalDailyMaxCount ||
+      recentAssetTotal > velocityAmountCap(params.asset);
+
+    const requiresReview =
+      aboveReviewThreshold(params.asset, params.amount) || overVelocity;
+
+    // Lock funds; throws if insufficient available balance.
     await lockWithdrawal(
       {
         userId: params.userId,
@@ -67,11 +102,14 @@ export async function requestWithdrawal(params: {
         {
           userId: params.userId,
           type: "WITHDRAWAL_REVIEW",
-          severity: "MEDIUM",
+          severity: overVelocity ? "HIGH" : "MEDIUM",
           metadata: {
+            kind: overVelocity ? "velocity" : "amount_threshold",
             withdrawalId: withdrawal.id,
             amount: params.amount.toString(),
             asset: params.asset,
+            recentCount: recent.length,
+            recentAssetTotal: recentAssetTotal.toString(),
           },
         },
         tx,
@@ -209,6 +247,15 @@ async function failWithdrawal(withdrawalId: string, note: string): Promise<void>
       data: { status: "FAILED", reviewNote: note.slice(0, 480) },
     });
   });
+}
+
+/** Rolling window for per-user withdrawal velocity. */
+const VELOCITY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function velocityAmountCap(asset: Asset): bigint {
+  return asset === "SOL"
+    ? env.withdrawalDailyMaxLamports
+    : env.withdrawalDailyMaxUsdc;
 }
 
 function aboveReviewThreshold(asset: Asset, amount: bigint): boolean {
