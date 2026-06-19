@@ -46,6 +46,7 @@ export function PokerTableView(props: PokerTableViewProps) {
     authQuery,
   });
   const [chatInput, setChatInput] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
 
   // Spectator status is fixed by the connection mode; seat identity comes from
   // the opaque per-table token the server sends (real ids are never broadcast).
@@ -116,18 +117,18 @@ export function PokerTableView(props: PokerTableViewProps) {
   // Demo tables use free chips; real tables are labeled in their asset.
   const unit = props.demo ? "chips" : props.asset;
 
+  // The whole table fits one screen: a fixed-height flex column (viewport minus
+  // the app header + page padding ≈ 8rem) where the felt absorbs the slack and
+  // everything else is compact, so the page itself never scrolls.
   return (
-    <div className="space-y-6">
-      {props.demo && (
-        <div className="rounded-xl border border-velvet/25 bg-velvet/[0.04] px-4 py-2.5 text-center text-sm text-velvet/90">
-          Free play — demo chips, no wallet or deposit needed. Nothing here is
-          real money.
-        </div>
-      )}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl text-ivory">{props.tableName}</h1>
-          <p className="text-xs text-ash">
+    <div className="flex h-[calc(100dvh-8rem)] flex-col gap-2.5">
+      {/* Compact header */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="truncate font-display text-xl text-ivory">
+            {props.tableName}
+          </h1>
+          <p className="text-[11px] text-ash">
             {table
               ? `${formatAmount(props.asset, BigInt(table.smallBlind))} / ${formatAmount(
                   props.asset,
@@ -138,9 +139,17 @@ export function PokerTableView(props: PokerTableViewProps) {
                 : "Connecting…"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {props.demo && (
+            <span
+              className="rounded-full border border-velvet/25 bg-velvet/[0.06] px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-velvet/90"
+              title="Free play — demo chips, no wallet or deposit needed. Nothing here is real money."
+            >
+              Free play
+            </span>
+          )}
           {isSpectator && (
-            <span className="rounded-full border border-velvet/30 bg-velvet/5 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-velvet/90">
+            <span className="rounded-full border border-velvet/30 bg-velvet/5 px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-velvet/90">
               Spectating
             </span>
           )}
@@ -171,13 +180,28 @@ export function PokerTableView(props: PokerTableViewProps) {
         </div>
       </div>
 
-      {/* Felt */}
-      <div className="relative overflow-hidden rounded-[2.5rem] border border-felt-light/30 bg-felt-radial p-4 shadow-elevated sm:p-8">
-        <div className="flex min-h-[180px] flex-col items-center justify-center gap-4">
+      {/* Felt — grows to fill the remaining height so nothing spills off-screen */}
+      <div className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-hidden rounded-3xl border border-felt-light/30 bg-felt-radial p-3 shadow-elevated sm:p-5">
+        {/* Seats */}
+        <div className="flex shrink-0 flex-wrap items-stretch justify-center gap-2">
+          {table?.seats.map((s) => (
+            <Seat
+              key={s.seat}
+              seat={s}
+              asset={props.asset}
+              isDealer={table.dealerSeat === s.seat}
+              isToAct={table.toActSeat === s.seat}
+              isYou={s.playerId === youToken}
+              holeCards={s.playerId === youToken ? state.holeCards : null}
+              clock={table.toActSeat === s.seat ? clock : null}
+            />
+          ))}
+        </div>
+
+        {/* Board + pot, centered in the remaining space */}
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3">
           {table && table.community.length > 0 ? (
-            // The full run-out is 5 large cards; scale the row down on narrow
-            // (portrait) phones so it never overflows the clipped felt.
-            <div className="flex origin-center scale-[0.6] items-center justify-center gap-1.5 min-[420px]:scale-[0.74] sm:scale-100 sm:gap-3">
+            <div className="flex origin-center scale-[0.55] items-center justify-center gap-1.5 min-[420px]:scale-[0.7] sm:scale-90 sm:gap-3 lg:scale-100">
               {table.community.map((c) => (
                 <Card3D key={c} card={c} size="lg" />
               ))}
@@ -197,109 +221,96 @@ export function PokerTableView(props: PokerTableViewProps) {
           )}
         </div>
 
-        {/* Seats */}
-        <div className="mt-8 flex flex-wrap items-stretch justify-center gap-3">
-          {table?.seats.map((s) => (
-            <Seat
-              key={s.seat}
-              seat={s}
-              asset={props.asset}
-              isDealer={table.dealerSeat === s.seat}
-              isToAct={table.toActSeat === s.seat}
-              isYou={s.playerId === youToken}
-              holeCards={s.playerId === youToken ? state.holeCards : null}
-              clock={table.toActSeat === s.seat ? clock : null}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Your hand — the one place we lean into the 3D card for emphasis. */}
-      {seated && state.holeCards && state.holeCards.length > 0 && (
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-eyebrow">Your hand</p>
-          <div className="flex items-end gap-4">
+        {/* Your hand — compact, anchored at the foot of the felt */}
+        {seated && state.holeCards && state.holeCards.length > 0 && (
+          <div className="flex shrink-0 items-end justify-center gap-3">
             {state.holeCards.map((c) => (
-              <Card3D key={c} card={c} size="lg" tilt />
+              <Card3D key={c} card={c} size="md" tilt />
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Showdown summary */}
-      {state.lastShowdown && (
-        <div className="card-surface p-4">
-          <p className="mb-2 text-xs text-ash">Showdown</p>
-          <ul className="space-y-1 text-sm">
-            {state.lastShowdown.results
-              .filter((r) => BigInt(r.amountWon) > 0n)
-              .map((r) => (
-                <li key={r.seat} className="text-ivory">
-                  Seat {r.seat + 1} wins {formatAmount(props.asset, BigInt(r.amountWon))}{" "}
-                  {unit} — {r.handDescription}
-                </li>
-              ))}
-          </ul>
-        </div>
-      )}
+        {/* Showdown — overlaid so it never changes the layout height */}
+        {state.lastShowdown && (
+          <div className="absolute inset-x-3 bottom-3 mx-auto max-w-md rounded-xl border border-velvet/30 bg-charcoal-900/95 p-3 backdrop-blur">
+            <p className="mb-1 text-[11px] uppercase tracking-wider text-ash">
+              Showdown
+            </p>
+            <ul className="space-y-0.5 text-sm">
+              {state.lastShowdown.results
+                .filter((r) => BigInt(r.amountWon) > 0n)
+                .map((r) => (
+                  <li key={r.seat} className="text-ivory">
+                    Seat {r.seat + 1} wins{" "}
+                    {formatAmount(props.asset, BigInt(r.amountWon))} {unit} —{" "}
+                    {r.handDescription}
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
-      {/* Action / buy-in */}
-      {isSpectator ? (
-        <div className="card-surface flex flex-col items-center gap-3 p-6 text-center">
-          <p className="text-sm text-ash">
-            You&apos;re spectating. Connect your wallet to take a seat and play.
-          </p>
-          <ConnectButton label="Connect wallet to take a seat" />
-        </div>
-      ) : !seated ? (
-        <BuyInPanel
-          asset={props.asset}
-          minBuyIn={BigInt(props.minBuyIn)}
-          maxBuyIn={BigInt(props.maxBuyIn)}
-          onBuyIn={buyIn}
-          demo={props.demo}
-        />
-      ) : isYourTurn && table ? (
-        <ActionBar
-          asset={props.asset}
-          toCall={state.toCall}
-          minRaiseTo={state.minRaiseTo}
-          currentBet={BigInt(table.currentBet)}
-          bigBlind={BigInt(table.bigBlind)}
-          pot={BigInt(table.totalPot)}
-          isPreflop={table.community.length === 0}
-          yourStack={BigInt(yourSeat!.stack)}
-          yourCommitted={BigInt(yourSeat!.committedThisStreet)}
-          secondsLeft={clock?.secondsLeft ?? null}
-          onAction={act}
-        />
-      ) : (
-        <p className="text-center text-sm text-ash">
-          {table?.toActSeat != null
-            ? `Waiting on seat ${table.toActSeat + 1}…`
-            : "Waiting for the next hand…"}
-        </p>
-      )}
-
-      {state.error && (
-        <p className="text-center text-sm text-red-300">{state.error}</p>
-      )}
-
-      {/* Chat */}
-      <div className="card-surface p-4">
-        <div className="mb-3 max-h-32 space-y-1 overflow-y-auto text-sm">
-          {state.chat.length === 0 ? (
-            <p className="text-xs text-ash/60">Table chat</p>
-          ) : (
-            state.chat.map((m, i) => (
-              <p key={i} className="text-ash">
-                <span className="text-ivory">{m.from}:</span> {m.message}
-              </p>
-            ))
-          )}
-        </div>
+      {/* Action / buy-in — pinned just below the felt */}
+      <div className="shrink-0">
         {isSpectator ? (
-          <p className="text-xs text-ash/60">
+          <div className="card-surface flex flex-col items-center gap-2 p-4 text-center">
+            <p className="text-sm text-ash">
+              You&apos;re spectating. Connect your wallet to take a seat and play.
+            </p>
+            <ConnectButton label="Connect wallet to take a seat" />
+          </div>
+        ) : !seated ? (
+          <BuyInPanel
+            asset={props.asset}
+            minBuyIn={BigInt(props.minBuyIn)}
+            maxBuyIn={BigInt(props.maxBuyIn)}
+            onBuyIn={buyIn}
+            demo={props.demo}
+          />
+        ) : isYourTurn && table ? (
+          <ActionBar
+            asset={props.asset}
+            toCall={state.toCall}
+            minRaiseTo={state.minRaiseTo}
+            currentBet={BigInt(table.currentBet)}
+            bigBlind={BigInt(table.bigBlind)}
+            pot={BigInt(table.totalPot)}
+            isPreflop={table.community.length === 0}
+            yourStack={BigInt(yourSeat!.stack)}
+            yourCommitted={BigInt(yourSeat!.committedThisStreet)}
+            secondsLeft={clock?.secondsLeft ?? null}
+            onAction={act}
+          />
+        ) : (
+          <p className="rounded-2xl border border-white/10 bg-charcoal-800/60 py-3 text-center text-sm text-ash">
+            {table?.toActSeat != null
+              ? `Waiting on seat ${table.toActSeat + 1}…`
+              : "Waiting for the next hand…"}
+          </p>
+        )}
+        {state.error && (
+          <p className="mt-1 text-center text-sm text-red-300">{state.error}</p>
+        )}
+      </div>
+
+      {/* Chat — a single compact row; history floats above when opened */}
+      <div className="relative shrink-0">
+        {chatOpen && (
+          <div className="absolute bottom-full mb-2 max-h-40 w-full space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-charcoal-900/95 p-3 text-sm shadow-elevated backdrop-blur">
+            {state.chat.length === 0 ? (
+              <p className="text-xs text-ash/60">No messages yet.</p>
+            ) : (
+              state.chat.map((m, i) => (
+                <p key={i} className="text-ash">
+                  <span className="text-ivory">{m.from}:</span> {m.message}
+                </p>
+              ))
+            )}
+          </div>
+        )}
+        {isSpectator ? (
+          <p className="text-center text-xs text-ash/60">
             Connect your wallet to join the conversation.
           </p>
         ) : (
@@ -310,8 +321,17 @@ export function PokerTableView(props: PokerTableViewProps) {
               send({ t: "SEND_CHAT", tableId: props.tableId, message: chatInput });
               setChatInput("");
             }}
-            className="flex gap-2"
+            className="flex items-center gap-2"
           >
+            <button
+              type="button"
+              onClick={() => setChatOpen((o) => !o)}
+              aria-label="Toggle table chat"
+              title="Table chat"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 text-sm text-ash transition-colors hover:text-ivory"
+            >
+              💬
+            </button>
             <input
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
