@@ -562,6 +562,9 @@ export class TableRoom {
 
     const deadline = Date.now() + this.config.actionTimeoutSeconds * 1000;
     this.actionDeadline = deadline;
+    // Re-broadcast now that the deadline is set, so every client can render this
+    // seat's live countdown — not only the player being prompted below.
+    this.broadcastTableState();
     this.send(seat.playerId, {
       t: "ACTION_REQUIRED",
       tableId: this.config.tableId,

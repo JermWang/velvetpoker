@@ -120,6 +120,18 @@ async function main() {
     "the hand played through to showdown / completion",
   );
 
+  // Opponents' live countdown: the server re-broadcasts the action deadline the
+  // moment it sets a seat to act, so every client (not just the prompted player)
+  // can render the timer ticking down on the active seat.
+  type StateEv = { t: string; state?: { toActSeat: number | null; actionDeadline: number | null } };
+  const broadcastDeadline = [...g1.events, ...g2.events].some(
+    (e) =>
+      (e as StateEv).t === "TABLE_STATE" &&
+      (e as StateEv).state?.toActSeat != null &&
+      (e as StateEv).state?.actionDeadline != null,
+  );
+  assert(broadcastDeadline, "the action deadline is broadcast to all clients (opponent countdowns)");
+
   // Seat-stuffing guard: a seated guest cannot take a second seat.
   g1.events.length = 0;
   g1.ws.send(JSON.stringify({ t: "BUY_IN", tableId: table.id, amount: buyIn }));
