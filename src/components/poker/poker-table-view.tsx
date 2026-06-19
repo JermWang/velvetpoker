@@ -186,10 +186,10 @@ export function PokerTableView(props: PokerTableViewProps) {
       </div>
 
       {/* Felt — an oval table with players seated around the rim */}
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-3xl bg-felt-radial p-2 shadow-elevated">
-        <div className="relative mx-auto h-full w-full max-w-3xl">
+      <div className="relative min-h-0 flex-1 overflow-hidden rounded-3xl bg-felt-radial p-1 shadow-elevated">
+        <div className="relative mx-auto h-full w-full max-w-5xl">
           {/* Table surface */}
-          <div className="pointer-events-none absolute inset-x-[5%] inset-y-[13%] rounded-[46%] border-[3px] border-felt-light/25 bg-felt-dark/25 shadow-[inset_0_2px_30px_rgba(0,0,0,0.5)]" />
+          <div className="pointer-events-none absolute inset-x-[3%] top-[11%] bottom-[15%] rounded-[46%] border-[3px] border-felt-light/25 bg-felt-dark/25 shadow-[inset_0_2px_30px_rgba(0,0,0,0.5)]" />
 
           {/* Center — board + pot */}
           <div className="absolute inset-x-[16%] inset-y-[32%] flex flex-col items-center justify-center gap-2">
@@ -369,7 +369,8 @@ export function PokerTableView(props: PokerTableViewProps) {
 function seatPosition(slot: number, n: number): { x: number; y: number } {
   const angle = Math.PI / 2 + (n > 0 ? (slot / n) * Math.PI * 2 : 0);
   // Centred slightly high (48%) so the taller hero cluster at the bottom clears
-  // the felt edge; wide horizontal radius for a long, table-like oval.
+  // the felt edge. rx leaves room for the ~100px-wide seat clusters at the
+  // sides; ry stays modest so a 6-max top seat doesn't clip.
   return { x: 50 + 45 * Math.cos(angle), y: 48 + 33 * Math.sin(angle) };
 }
 
