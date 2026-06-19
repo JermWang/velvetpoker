@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTableSocket } from "@/lib/realtime/use-table-socket";
 import { formatAmount, parseAmount } from "@/lib/ledger/money";
 import type { Asset } from "@/lib/ledger/money";
@@ -63,6 +63,38 @@ export function PokerTableView(props: PokerTableViewProps) {
   const isYourTurn =
     yourSeat != null && state.yourTurnSeat === yourSeat.seat;
 
+  // Live action clock for whichever seat is to act. Your own deadline arrives
+  // reliably on ACTION_REQUIRED (state.actionDeadline); other seats fall back to
+  // the broadcast table deadline.
+  const activeDeadline =
+    yourSeat != null && table?.toActSeat === yourSeat.seat
+      ? state.actionDeadline
+      : (table?.actionDeadline ?? null);
+  const clock = useActionClock(table?.toActSeat ?? null, activeDeadline);
+
+  // AFK cues: a beep + a tab-title ping the moment it becomes your turn, with a
+  // persisted mute toggle. The visual cue is the pulsing action bar below.
+  const [muted, setMuted] = useState(false);
+  useEffect(() => {
+    try {
+      setMuted(localStorage.getItem("velvet_mute_turn") === "1");
+    } catch {
+      /* localStorage unavailable */
+    }
+  }, []);
+  const toggleMute = useCallback(() => {
+    setMuted((m) => {
+      const next = !m;
+      try {
+        localStorage.setItem("velvet_mute_turn", next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+  useTurnAlert(isYourTurn, muted);
+
   function act(action: ActionType, amount?: bigint) {
     send({
       t: "PLAYER_ACTION",
@@ -117,6 +149,15 @@ export function PokerTableView(props: PokerTableViewProps) {
               state.connected ? "bg-emerald-400" : "bg-amber-400 animate-pulse-soft"
             }`}
           />
+          <button
+            type="button"
+            onClick={toggleMute}
+            aria-label={muted ? "Unmute turn alerts" : "Mute turn alerts"}
+            title={muted ? "Turn sound off" : "Turn sound on"}
+            className="grid h-7 w-7 place-items-center rounded-full border border-white/10 bg-white/5 text-sm text-ash transition-colors hover:text-ivory"
+          >
+            {muted ? "🔇" : "🔔"}
+          </button>
           <VerifyHandDrawer handId={table?.handId ?? null} />
           {seated && (
             <Button
@@ -131,19 +172,21 @@ export function PokerTableView(props: PokerTableViewProps) {
       </div>
 
       {/* Felt */}
-      <div className="relative overflow-hidden rounded-[2.5rem] border border-felt-light/30 bg-felt-radial p-8 shadow-elevated">
+      <div className="relative overflow-hidden rounded-[2.5rem] border border-felt-light/30 bg-felt-radial p-4 shadow-elevated sm:p-8">
         <div className="flex min-h-[180px] flex-col items-center justify-center gap-4">
-          <div className="flex items-center gap-3">
-            {table && table.community.length > 0 ? (
-              table.community.map((c) => (
+          {table && table.community.length > 0 ? (
+            // The full run-out is 5 large cards; scale the row down on narrow
+            // (portrait) phones so it never overflows the clipped felt.
+            <div className="flex origin-center scale-[0.6] items-center justify-center gap-1.5 min-[420px]:scale-[0.74] sm:scale-100 sm:gap-3">
+              {table.community.map((c) => (
                 <Card3D key={c} card={c} size="lg" />
-              ))
-            ) : (
-              <p className="text-sm text-ivory/50">
-                {table?.handId ? "Awaiting the flop" : "Waiting for the next hand"}
-              </p>
-            )}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-ivory/50">
+              {table?.handId ? "Awaiting the flop" : "Waiting for the next hand"}
+            </p>
+          )}
           {table && (
             <div className="rounded-full border border-velvet/30 bg-charcoal-900/40 px-4 py-1.5">
               <span className="text-xs text-ash">Pot </span>
@@ -165,6 +208,7 @@ export function PokerTableView(props: PokerTableViewProps) {
               isToAct={table.toActSeat === s.seat}
               isYou={s.playerId === youToken}
               holeCards={s.playerId === youToken ? state.holeCards : null}
+              clock={table.toActSeat === s.seat ? clock : null}
             />
           ))}
         </div>
@@ -221,8 +265,12 @@ export function PokerTableView(props: PokerTableViewProps) {
           toCall={state.toCall}
           minRaiseTo={state.minRaiseTo}
           currentBet={BigInt(table.currentBet)}
+          bigBlind={BigInt(table.bigBlind)}
+          pot={BigInt(table.totalPot)}
+          isPreflop={table.community.length === 0}
           yourStack={BigInt(yourSeat!.stack)}
           yourCommitted={BigInt(yourSeat!.committedThisStreet)}
+          secondsLeft={clock?.secondsLeft ?? null}
           onAction={act}
         />
       ) : (
@@ -278,4 +326,111 @@ export function PokerTableView(props: PokerTableViewProps) {
       </div>
     </div>
   );
+}
+
+/**
+ * Ticks while it's someone's turn and returns the seconds left + a 0..1 fraction
+ * for the depleting bar. The full duration is captured when the turn starts, so
+ * the bar is accurate without the client knowing the configured timeout.
+ */
+function useActionClock(
+  toActSeat: number | null,
+  deadline: number | null,
+): { secondsLeft: number; fraction: number } | null {
+  const [now, setNow] = useState(() => Date.now());
+  const totalRef = useRef<{ key: string; total: number } | null>(null);
+
+  useEffect(() => {
+    if (toActSeat == null || deadline == null) {
+      totalRef.current = null;
+      return;
+    }
+    const key = `${toActSeat}:${deadline}`;
+    if (!totalRef.current || totalRef.current.key !== key) {
+      totalRef.current = { key, total: Math.max(1000, deadline - Date.now()) };
+    }
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [toActSeat, deadline]);
+
+  if (toActSeat == null || deadline == null) return null;
+  const msLeft = Math.max(0, deadline - now);
+  const total = totalRef.current?.total ?? 30_000;
+  return {
+    secondsLeft: Math.ceil(msLeft / 1000),
+    fraction: Math.max(0, Math.min(1, msLeft / total)),
+  };
+}
+
+let sharedAudioCtx: AudioContext | null = null;
+
+/** A short two-note chime via Web Audio (no asset needed). Best-effort. */
+function playTurnChime() {
+  try {
+    const Ctx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!Ctx) return;
+    sharedAudioCtx = sharedAudioCtx ?? new Ctx();
+    const ctx = sharedAudioCtx;
+    if (ctx.state === "suspended") void ctx.resume();
+    const t0 = ctx.currentTime;
+    (
+      [
+        [660, 0],
+        [880, 0.16],
+      ] as const
+    ).forEach(([freq, off]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const start = t0 + off;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.18, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.14);
+      osc.start(start);
+      osc.stop(start + 0.16);
+    });
+  } catch {
+    /* audio blocked or unavailable — non-fatal */
+  }
+}
+
+/**
+ * Fires the AFK cues when it becomes your turn: a chime (unless muted) and a
+ * tab-title ping that's restored when your turn ends or the view unmounts.
+ */
+function useTurnAlert(isYourTurn: boolean, muted: boolean) {
+  const prev = useRef(false);
+  const originalTitle = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (originalTitle.current == null && typeof document !== "undefined") {
+      originalTitle.current = document.title;
+    }
+    if (isYourTurn && !prev.current) {
+      if (!muted) playTurnChime();
+      if (typeof document !== "undefined") {
+        document.title = "🔔 Your turn — Velvet Poker";
+      }
+    } else if (!isYourTurn && prev.current) {
+      if (typeof document !== "undefined" && originalTitle.current != null) {
+        document.title = originalTitle.current;
+      }
+    }
+    prev.current = isYourTurn;
+  }, [isYourTurn, muted]);
+
+  useEffect(() => {
+    return () => {
+      if (typeof document !== "undefined" && originalTitle.current != null) {
+        document.title = originalTitle.current;
+      }
+    };
+  }, []);
 }

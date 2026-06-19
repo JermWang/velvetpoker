@@ -12,6 +12,7 @@ export function Seat({
   isToAct,
   isYou,
   holeCards,
+  clock,
 }: {
   seat: WireSeat;
   asset: Asset;
@@ -19,8 +20,11 @@ export function Seat({
   isToAct: boolean;
   isYou: boolean;
   holeCards?: Card[] | null;
+  /** Live action clock for the seat to act; null for every other seat. */
+  clock?: { secondsLeft: number; fraction: number } | null;
 }) {
   const empty = !seat.playerId;
+  const urgent = clock != null && clock.secondsLeft <= 5;
 
   return (
     <div
@@ -29,7 +33,7 @@ export function Seat({
         empty
           ? "border-dashed border-white/10 bg-transparent"
           : "border-white/10 bg-charcoal-800/80",
-        isToAct && "border-velvet/60 shadow-velvet",
+        isToAct && "border-velvet/70 animate-turn",
         seat.hasFolded && "opacity-40",
       )}
     >
@@ -92,6 +96,33 @@ export function Seat({
               </span>
             )}
           </div>
+
+          {/* Live action clock — visible to everyone so an AFK player reads at
+              a glance, and turns red in the final seconds. */}
+          {isToAct && clock && (
+            <div className="mt-0.5 w-full">
+              <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wider">
+                <span
+                  className={cn(
+                    "inline-block h-1.5 w-1.5 rounded-full",
+                    urgent ? "bg-red-400 animate-pulse-soft" : "bg-velvet",
+                  )}
+                />
+                <span className={urgent ? "text-red-300" : "text-velvet"}>
+                  To act · {clock.secondsLeft}s
+                </span>
+              </div>
+              <div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-[width] duration-200 ease-linear",
+                    urgent ? "bg-red-400" : "bg-velvet",
+                  )}
+                  style={{ width: `${Math.round(clock.fraction * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
