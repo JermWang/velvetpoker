@@ -117,6 +117,11 @@ export function PokerTableView(props: PokerTableViewProps) {
   // Demo tables use free chips; real tables are labeled in their asset.
   const unit = props.demo ? "chips" : props.asset;
 
+  // Oval-table layout: every seat is placed on an ellipse, rotated so your own
+  // seat sits at the bottom-center and opponents fan out around the rim.
+  const seatCount = table?.seats.length ?? 0;
+  const heroSlotAnchor = yourSeat?.seat ?? 0;
+
   // The whole table fits one screen: a fixed-height flex column (viewport minus
   // the app header + page padding ≈ 8rem) where the felt absorbs the slack and
   // everything else is compact, so the page itself never scrolls.
@@ -180,75 +185,84 @@ export function PokerTableView(props: PokerTableViewProps) {
         </div>
       </div>
 
-      {/* Felt — grows to fill the remaining height so nothing spills off-screen */}
-      <div className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-hidden rounded-3xl border border-felt-light/30 bg-felt-radial p-3 shadow-elevated sm:p-5">
-        {/* Seats */}
-        <div className="flex shrink-0 flex-wrap items-stretch justify-center gap-2">
-          {table?.seats.map((s) => (
-            <Seat
-              key={s.seat}
-              seat={s}
-              asset={props.asset}
-              isDealer={table.dealerSeat === s.seat}
-              isToAct={table.toActSeat === s.seat}
-              isYou={s.playerId === youToken}
-              holeCards={s.playerId === youToken ? state.holeCards : null}
-              clock={table.toActSeat === s.seat ? clock : null}
-            />
-          ))}
-        </div>
+      {/* Felt — an oval table with players seated around the rim */}
+      <div className="relative min-h-0 flex-1 overflow-hidden rounded-3xl bg-felt-radial p-2 shadow-elevated">
+        <div className="relative mx-auto h-full w-full max-w-3xl">
+          {/* Table surface */}
+          <div className="pointer-events-none absolute inset-x-[5%] inset-y-[13%] rounded-[46%] border-[3px] border-felt-light/25 bg-felt-dark/25 shadow-[inset_0_2px_30px_rgba(0,0,0,0.5)]" />
 
-        {/* Board + pot, centered in the remaining space */}
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3">
-          {table && table.community.length > 0 ? (
-            <div className="flex origin-center scale-[0.55] items-center justify-center gap-1.5 min-[420px]:scale-[0.7] sm:scale-90 sm:gap-3 lg:scale-100">
-              {table.community.map((c) => (
-                <Card3D key={c} card={c} size="lg" />
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-ivory/50">
-              {table?.handId ? "Awaiting the flop" : "Waiting for the next hand"}
-            </p>
-          )}
-          {table && (
-            <div className="rounded-full border border-velvet/30 bg-charcoal-900/40 px-4 py-1.5">
-              <span className="text-xs text-ash">Pot </span>
-              <span className="font-mono text-velvet">
-                {formatAmount(props.asset, BigInt(table.totalPot))} {unit}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Your hand — compact, anchored at the foot of the felt */}
-        {seated && state.holeCards && state.holeCards.length > 0 && (
-          <div className="flex shrink-0 items-end justify-center gap-3">
-            {state.holeCards.map((c) => (
-              <Card3D key={c} card={c} size="md" tilt />
-            ))}
-          </div>
-        )}
-
-        {/* Showdown — overlaid so it never changes the layout height */}
-        {state.lastShowdown && (
-          <div className="absolute inset-x-3 bottom-3 mx-auto max-w-md rounded-xl border border-velvet/30 bg-charcoal-900/95 p-3 backdrop-blur">
-            <p className="mb-1 text-[11px] uppercase tracking-wider text-ash">
-              Showdown
-            </p>
-            <ul className="space-y-0.5 text-sm">
-              {state.lastShowdown.results
-                .filter((r) => BigInt(r.amountWon) > 0n)
-                .map((r) => (
-                  <li key={r.seat} className="text-ivory">
-                    Seat {r.seat + 1} wins{" "}
-                    {formatAmount(props.asset, BigInt(r.amountWon))} {unit} —{" "}
-                    {r.handDescription}
-                  </li>
+          {/* Center — board + pot */}
+          <div className="absolute inset-x-[16%] inset-y-[32%] flex flex-col items-center justify-center gap-2">
+            {table && table.community.length > 0 ? (
+              <div className="flex origin-center scale-[0.42] items-center justify-center gap-1 min-[420px]:scale-[0.55] sm:scale-[0.7] sm:gap-2">
+                {table.community.map((c) => (
+                  <Card3D key={c} card={c} size="lg" />
                 ))}
-            </ul>
+              </div>
+            ) : (
+              <p className="text-center text-xs text-ivory/45">
+                {table?.handId ? "Awaiting the flop" : "Waiting for the next hand"}
+              </p>
+            )}
+            {table && (
+              <div className="rounded-full border border-velvet/30 bg-charcoal-900/55 px-3 py-1">
+                <span className="text-[11px] text-ash">Pot </span>
+                <span className="font-mono text-sm text-velvet">
+                  {formatAmount(props.asset, BigInt(table.totalPot))} {unit}
+                </span>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Seats around the rim */}
+          {table?.seats.map((s) => {
+            const pos = seatPosition(
+              (s.seat - heroSlotAnchor + seatCount) % seatCount,
+              seatCount,
+            );
+            return (
+              <div
+                key={s.seat}
+                className="absolute"
+                style={{
+                  left: `${pos.x}%`,
+                  top: `${pos.y}%`,
+                  transform: "translate(-50%, -50%)",
+                }}
+              >
+                <Seat
+                  seat={s}
+                  asset={props.asset}
+                  isDealer={table.dealerSeat === s.seat}
+                  isToAct={table.toActSeat === s.seat}
+                  isYou={s.playerId === youToken}
+                  holeCards={s.playerId === youToken ? state.holeCards : null}
+                  clock={table.toActSeat === s.seat ? clock : null}
+                />
+              </div>
+            );
+          })}
+
+          {/* Showdown — overlaid at the top so it never blocks the action */}
+          {state.lastShowdown && (
+            <div className="absolute inset-x-4 top-1 mx-auto max-w-md rounded-xl border border-velvet/30 bg-charcoal-900/95 p-2.5 backdrop-blur">
+              <p className="mb-1 text-[11px] uppercase tracking-wider text-ash">
+                Showdown
+              </p>
+              <ul className="space-y-0.5 text-sm">
+                {state.lastShowdown.results
+                  .filter((r) => BigInt(r.amountWon) > 0n)
+                  .map((r) => (
+                    <li key={r.seat} className="text-ivory">
+                      Seat {r.seat + 1} wins{" "}
+                      {formatAmount(props.asset, BigInt(r.amountWon))} {unit} —{" "}
+                      {r.handDescription}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Action / buy-in — pinned just below the felt */}
@@ -346,6 +360,17 @@ export function PokerTableView(props: PokerTableViewProps) {
       </div>
     </div>
   );
+}
+
+/**
+ * Place a seat on the table ellipse. Slot 0 sits at the bottom-center (the
+ * hero); the remaining slots fan out clockwise around the rim.
+ */
+function seatPosition(slot: number, n: number): { x: number; y: number } {
+  const angle = Math.PI / 2 + (n > 0 ? (slot / n) * Math.PI * 2 : 0);
+  // Centred slightly high (48%) so the taller hero cluster at the bottom clears
+  // the felt edge; wide horizontal radius for a long, table-like oval.
+  return { x: 50 + 45 * Math.cos(angle), y: 48 + 33 * Math.sin(angle) };
 }
 
 /**
