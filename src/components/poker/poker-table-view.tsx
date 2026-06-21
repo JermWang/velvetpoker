@@ -6,7 +6,7 @@ import { formatAmount, parseAmount } from "@/lib/ledger/money";
 import type { Asset } from "@/lib/ledger/money";
 import type { ActionType } from "@/lib/poker/types";
 import { Seat } from "./seat";
-import { Card3D } from "./card-3d";
+import { PlayingCard } from "./playing-card";
 import { ActionBar } from "./action-bar";
 import { BuyInPanel } from "./buy-in-panel";
 import { VerifyHandDrawer } from "./verify-hand-drawer";
@@ -27,6 +27,27 @@ export interface PokerTableViewProps {
   demo?: boolean;
   /** Guest free-play: generate an ephemeral id and connect as a guest. */
   guestMode?: boolean;
+}
+
+/** A milled velvet poker chip rendered in pure CSS (striped edge + face rings). */
+function Chip({ size = 20 }: { size?: number }) {
+  return (
+    <span
+      style={{ position: "relative", display: "inline-block", width: size, height: size }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: "50%",
+          background:
+            "conic-gradient(from 0deg,#8f1d2c 0 30deg,#efe9df 30deg 60deg,#8f1d2c 60deg 90deg,#efe9df 90deg 120deg,#8f1d2c 120deg 150deg,#efe9df 150deg 180deg,#8f1d2c 180deg 210deg,#efe9df 210deg 240deg,#8f1d2c 240deg 270deg,#efe9df 270deg 300deg,#8f1d2c 300deg 330deg,#efe9df 330deg 360deg)",
+          boxShadow:
+            "0 -3px 0 -1px #6f1521, 0 -5px 0 -2px #8f1d2c, inset 0 0 0 2px rgba(255,255,255,0.14), inset 0 0 0 3px #b03a48",
+        }}
+      />
+    </span>
+  );
 }
 
 export function PokerTableView(props: PokerTableViewProps) {
@@ -185,18 +206,82 @@ export function PokerTableView(props: PokerTableViewProps) {
         </div>
       </div>
 
-      {/* Felt — an oval table with players seated around the rim */}
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-3xl bg-felt-radial p-1 shadow-elevated">
+      {/* Felt — an oval table with a leather rail and players seated around the rim */}
+      <div
+        className="relative min-h-0 flex-1 overflow-hidden rounded-3xl shadow-elevated"
+        style={{
+          background:
+            "radial-gradient(120% 90% at 50% 8%, rgba(27,77,58,0.18), transparent 55%), #0c0d10",
+        }}
+      >
         <div className="relative mx-auto h-full w-full max-w-5xl">
-          {/* Table surface */}
-          <div className="pointer-events-none absolute inset-x-[3%] top-[11%] bottom-[15%] rounded-[46%] border-[3px] border-felt-light/25 bg-felt-dark/25 shadow-[inset_0_2px_30px_rgba(0,0,0,0.5)]" />
+          {/* Rail + felt surface */}
+          <div className="pointer-events-none absolute" style={{ inset: "5% 3%" }}>
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "50%",
+                background:
+                  "linear-gradient(180deg,#2c171b 0%,#1a0d10 60%,#140a0c 100%)",
+                padding: 18,
+                boxSizing: "border-box",
+                boxShadow:
+                  "0 44px 90px -38px rgba(0,0,0,0.85), inset 0 2px 0 rgba(255,255,255,0.06), inset 0 0 0 1px rgba(176,58,72,0.26), inset 0 -8px 20px rgba(0,0,0,0.5)",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 18,
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  background:
+                    "radial-gradient(ellipse at 50% 40%, #1d5440 0%, #143b2d 50%, #0c2820 100%)",
+                  boxShadow:
+                    "inset 0 0 70px rgba(0,0,0,0.55), inset 0 0 0 2px rgba(255,255,255,0.04), inset 0 0 0 7px rgba(12,40,32,0.55)",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background:
+                      "repeating-linear-gradient(45deg, rgba(255,255,255,0.011) 0 2px, transparent 2px 6px)",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 16,
+                    borderRadius: "50%",
+                    border: "1px solid rgba(176,58,72,0.16)",
+                  }}
+                />
+                <div
+                  className="font-display"
+                  style={{
+                    position: "absolute",
+                    left: "50%",
+                    top: "50%",
+                    transform: "translate(-50%,-58%)",
+                    fontSize: 200,
+                    color: "rgba(255,255,255,0.022)",
+                    lineHeight: 1,
+                  }}
+                >
+                  V
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Center — board + pot */}
-          <div className="absolute inset-x-[16%] inset-y-[32%] flex flex-col items-center justify-center gap-2">
+          <div className="absolute inset-x-[16%] inset-y-[30%] flex flex-col items-center justify-center gap-3">
             {table && table.community.length > 0 ? (
-              <div className="flex origin-center scale-[0.42] items-center justify-center gap-1 min-[420px]:scale-[0.55] sm:scale-[0.7] sm:gap-2">
+              <div className="flex origin-center scale-[0.62] items-center justify-center gap-1.5 min-[420px]:scale-75 sm:scale-100 sm:gap-2">
                 {table.community.map((c) => (
-                  <Card3D key={c} card={c} size="lg" />
+                  <PlayingCard key={c} card={c} size="lg" />
                 ))}
               </div>
             ) : (
@@ -205,14 +290,42 @@ export function PokerTableView(props: PokerTableViewProps) {
               </p>
             )}
             {table && (
-              <div className="rounded-full border border-velvet/30 bg-charcoal-900/55 px-3 py-1">
-                <span className="text-[11px] text-ash">Pot </span>
-                <span className="font-mono text-sm text-velvet">
+              <div className="flex items-center gap-2 rounded-full border border-velvet/30 bg-charcoal-900/55 px-3.5 py-1.5 backdrop-blur">
+                <Chip size={22} />
+                <span className="text-[11px] text-ash">Pot</span>
+                <span className="font-mono text-sm text-velvet-soft">
                   {formatAmount(props.asset, BigInt(table.totalPot))} {unit}
                 </span>
               </div>
             )}
           </div>
+
+          {/* Live bets — chips on the felt in front of each player */}
+          {table?.seats.map((s) => {
+            if (!s.playerId) return null;
+            const bet = BigInt(s.committedThisStreet);
+            if (bet <= 0n) return null;
+            const pos = seatPosition(
+              (s.seat - heroSlotAnchor + seatCount) % seatCount,
+              seatCount,
+            );
+            const bx = pos.x + (50 - pos.x) * 0.34;
+            const by = pos.y + (48 - pos.y) * 0.34;
+            return (
+              <div
+                key={`bet-${s.seat}`}
+                className="absolute z-[4] -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${bx}%`, top: `${by}%` }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Chip size={18} />
+                  <span className="rounded-full border border-white/8 bg-charcoal-900/80 px-2 py-px font-mono text-[10px] text-ivory">
+                    {formatAmount(props.asset, bet)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
 
           {/* Seats around the rim */}
           {table?.seats.map((s) => {
@@ -223,7 +336,7 @@ export function PokerTableView(props: PokerTableViewProps) {
             return (
               <div
                 key={s.seat}
-                className="absolute"
+                className="absolute z-[5]"
                 style={{
                   left: `${pos.x}%`,
                   top: `${pos.y}%`,
@@ -245,7 +358,7 @@ export function PokerTableView(props: PokerTableViewProps) {
 
           {/* Showdown — overlaid at the top so it never blocks the action */}
           {state.lastShowdown && (
-            <div className="absolute inset-x-4 top-1 mx-auto max-w-md rounded-xl border border-velvet/30 bg-charcoal-900/95 p-2.5 backdrop-blur">
+            <div className="absolute inset-x-4 top-1 z-[8] mx-auto max-w-md rounded-xl border border-velvet/30 bg-charcoal-900/95 p-2.5 backdrop-blur">
               <p className="mb-1 text-[11px] uppercase tracking-wider text-ash">
                 Showdown
               </p>

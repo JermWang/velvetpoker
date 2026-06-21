@@ -121,3 +121,40 @@
     @apply text-xs uppercase tracking-[0.25em] text-velvet/80;
   }
 }
+
+/* ============================================================
+   Velvet table — gameplay polish
+   Append these rules to src/app/globals.css (anywhere after the
+   existing @keyframes block). They style the bet slider thumb used
+   by the redesigned ActionBar. Everything else reuses tokens and
+   utilities you already have (velvet, felt, charcoal, .animate-attn,
+   .animate-turn, shadow-elevated, font-display).
+   ============================================================ */
+
+.vp-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8f1d2c, #b03a48);
+  outline: none;
+}
+.vp-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f4f1e8;
+  border: 3px solid #b03a48;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.vp-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f4f1e8;
+  border: 3px solid #b03a48;
+  cursor: pointer;
+}
