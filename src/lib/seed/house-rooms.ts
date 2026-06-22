@@ -34,34 +34,35 @@ export interface HouseRoom {
   maxBuyIn: bigint;
 }
 
-// USDC cash tiers — round dollar blinds and buy-in ranges. Three tiers + the
-// free-play demo = four lobbies total.
-export const HOUSE_ROOMS: HouseRoom[] = [
-  {
-    code: "HOUSE-MICRO",
-    name: "Velvet — $20",
-    sb: usdc(0.1),
-    bb: usdc(0.2),
-    minBuyIn: usdc(10),
-    maxBuyIn: usdc(20),
-  },
-  {
-    code: "HOUSE-LOW",
-    name: "Velvet — $50",
-    sb: usdc(0.25),
-    bb: usdc(0.5),
-    minBuyIn: usdc(25),
-    maxBuyIn: usdc(50),
-  },
-  {
-    code: "HOUSE-MID",
-    name: "Velvet — $100",
-    sb: usdc(0.5),
-    bb: usdc(1),
-    minBuyIn: usdc(50),
-    maxBuyIn: usdc(100),
-  },
+// USDC cash tiers (round dollar blinds + buy-in ranges). The highest tier is
+// always branded "The Velvet Room"; lower tiers are named by their buy-in.
+// Three tiers + the free-play demo = four lobbies total.
+interface Tier {
+  code: string;
+  usd: number; // headline buy-in, also the display label
+  sb: bigint;
+  bb: bigint;
+  minBuyIn: bigint;
+  maxBuyIn: bigint;
+}
+
+const TIERS: Tier[] = [
+  { code: "HOUSE-MICRO", usd: 20, sb: usdc(0.1), bb: usdc(0.2), minBuyIn: usdc(10), maxBuyIn: usdc(20) },
+  { code: "HOUSE-LOW", usd: 50, sb: usdc(0.25), bb: usdc(0.5), minBuyIn: usdc(25), maxBuyIn: usdc(50) },
+  { code: "HOUSE-MID", usd: 100, sb: usdc(0.5), bb: usdc(1), minBuyIn: usdc(50), maxBuyIn: usdc(100) },
 ];
+
+// The highest-stakes tier (by buy-in) gets the flagship name.
+const HIGHEST_USD = Math.max(...TIERS.map((t) => t.usd));
+
+export const HOUSE_ROOMS: HouseRoom[] = TIERS.map((t) => ({
+  code: t.code,
+  name: t.usd === HIGHEST_USD ? "The Velvet Room" : `Velvet — $${t.usd}`,
+  sb: t.sb,
+  bb: t.bb,
+  minBuyIn: t.minBuyIn,
+  maxBuyIn: t.maxBuyIn,
+}));
 
 // Free-play demo table: free chips, no real money, open to wallet-less guests.
 // Nominal SOL denomination — it's free play, the asset label is never charged.
