@@ -62,9 +62,17 @@ function fbm(x: number, y: number): number {
 }
 
 export function AmbientBackground({ intensity = 1 }: { intensity?: number }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
+  // Decorative only. Skip on small screens, where the tracery reads as visual
+  // noise behind a dense game UI — a clean dark background is far calmer.
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 640px)");
+    const update = () => setShow(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  if (!show) return null;
   return <AmbientCanvas intensity={intensity} />;
 }
 

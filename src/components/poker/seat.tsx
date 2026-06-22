@@ -47,6 +47,7 @@ export function Seat({
   handLabel,
   show3d,
   isWinner,
+  compact,
 }: {
   seat: WireSeat;
   asset: Asset;
@@ -64,6 +65,8 @@ export function Seat({
   show3d?: boolean;
   /** This seat won the pot — pulse the avatar gold. */
   isWinner?: boolean;
+  /** Tighter sizing for small/portrait screens. */
+  compact?: boolean;
 }) {
   if (!seat.playerId) {
     return (
@@ -100,9 +103,13 @@ export function Seat({
           {revealed ? (
             revealed.map((c) =>
               isYou && show3d ? (
-                <Card3D key={c} card={c} size="md" glow float />
+                <Card3D key={c} card={c} size={compact ? "sm" : "md"} glow float />
               ) : (
-                <PlayingCard key={c} card={c} size={isYou ? "md" : "sm"} />
+                <PlayingCard
+                  key={c}
+                  card={c}
+                  size={isYou && !compact ? "md" : "sm"}
+                />
               ),
             )
           ) : (

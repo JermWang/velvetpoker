@@ -259,7 +259,7 @@ export function PokerTableView(props: PokerTableViewProps) {
         <div className="flex items-center gap-1.5">
           {props.demo && (
             <span
-              className="rounded-full border border-velvet/25 bg-velvet/[0.06] px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-velvet/90"
+              className="hidden rounded-full border border-velvet/25 bg-velvet/[0.06] px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-velvet/90 sm:inline-block"
               title="Free play — demo chips, no wallet or deposit needed. Nothing here is real money."
             >
               Free play
@@ -289,6 +289,7 @@ export function PokerTableView(props: PokerTableViewProps) {
             <Button
               size="sm"
               variant="ghost"
+              className="whitespace-nowrap px-2 text-xs"
               onClick={toggleSitOut}
               title={yourSeat?.sittingOut ? "Return to play" : "Sit out the next hand"}
             >
@@ -296,14 +297,21 @@ export function PokerTableView(props: PokerTableViewProps) {
             </Button>
           )}
           {seated && BigInt(yourSeat?.stack ?? "0") < BigInt(props.maxBuyIn) && (
-            <Button size="sm" variant="ghost" onClick={rebuyToMax} title="Top up to the max stack">
-              Add chips
+            <Button
+              size="sm"
+              variant="ghost"
+              className="whitespace-nowrap px-2 text-xs"
+              onClick={rebuyToMax}
+              title="Top up to the max stack"
+            >
+              + Chips
             </Button>
           )}
           {seated && (
             <Button
               size="sm"
               variant="ghost"
+              className="whitespace-nowrap px-2 text-xs"
               onClick={() => send({ t: "LEAVE_TABLE", tableId: props.tableId })}
             >
               Leave
@@ -386,9 +394,9 @@ export function PokerTableView(props: PokerTableViewProps) {
           </div>
 
           {/* Center — board + pot */}
-          <div className="absolute inset-x-[16%] inset-y-[30%] flex flex-col items-center justify-center gap-3">
+          <div className="absolute inset-x-[10%] inset-y-[24%] flex flex-col items-center justify-center gap-2 sm:inset-x-[16%] sm:inset-y-[30%] sm:gap-3">
             {table && table.community.length > 0 ? (
-              <div className="flex origin-center scale-[0.62] items-center justify-center gap-1.5 min-[420px]:scale-75 sm:scale-100 sm:gap-2">
+              <div className="flex origin-center scale-[0.5] items-center justify-center gap-1.5 min-[420px]:scale-[0.62] sm:scale-100 sm:gap-2">
                 {table.community.map((c) => (
                   <PlayingCard key={c} card={c} size="lg" />
                 ))}
@@ -483,6 +491,7 @@ export function PokerTableView(props: PokerTableViewProps) {
                   handLabel={showdownBySeat.get(s.seat)?.handDescription ?? null}
                   show3d={showdownBySeat.size > 0}
                   isWinner={winAmt != null}
+                  compact={isMobile}
                 />
               </div>
             );
