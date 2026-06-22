@@ -49,7 +49,9 @@ export async function getCurrentUser(): Promise<User | null> {
       data: {
         ...(identity.email ? { email: identity.email } : {}),
         ...(role ? { role } : {}),
-        ...(displayName ? { displayName } : {}),
+        // Only seed a default display name if the user has none yet — NEVER
+        // overwrite a name the player chose (previously clobbered every login).
+        ...(!existing.displayName && displayName ? { displayName } : {}),
       },
     });
     // Backfill a referral code for users created before referrals existed.

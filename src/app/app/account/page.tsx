@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth/require-user";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
 import { AccountActions } from "@/components/account/account-actions";
+import { ProfileCard } from "@/components/account/profile-card";
 import { ReferralPanel } from "@/components/account/referral-panel";
 import { getReferralSummary } from "@/lib/referrals/referrals";
 
@@ -24,6 +25,15 @@ export default async function AccountPage() {
         <p className="text-eyebrow">Profile &amp; compliance</p>
         <h1 className="mt-2 font-display text-3xl text-ivory">Account</h1>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Profile</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ProfileCard displayName={user.displayName} avatarUrl={user.avatarUrl} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

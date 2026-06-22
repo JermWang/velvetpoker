@@ -29,12 +29,22 @@ export default async function AppLayout({
             {user && balances ? (
               <>
                 <BalancePill balances={balances} />
-                <div
-                  className="grid h-9 w-9 place-items-center rounded-full border border-white/12 bg-white/5 text-xs text-ivory"
-                  title={user.displayName ?? user.email ?? "Account"}
-                >
-                  {initials(user.displayName ?? user.email)}
-                </div>
+                {user.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={user.avatarUrl}
+                    alt="Your profile"
+                    className="h-9 w-9 rounded-full border border-white/12 object-cover"
+                    title={user.displayName ?? user.email ?? "Account"}
+                  />
+                ) : (
+                  <div
+                    className="grid h-9 w-9 place-items-center rounded-full border border-white/12 bg-white/5 text-xs text-ivory"
+                    title={user.displayName ?? user.email ?? "Account"}
+                  >
+                    {initials(user.displayName ?? user.email)}
+                  </div>
+                )}
                 <AuthMenu />
               </>
             ) : (

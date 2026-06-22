@@ -15,7 +15,6 @@ type Action =
 export function AccountActions() {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
-  const [name, setName] = useState("");
   const [country, setCountry] = useState("US");
   const [limit, setLimit] = useState("5");
 
@@ -32,20 +31,6 @@ export function AccountActions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="grow">
-          <Label htmlFor="dn">Display name</Label>
-          <Input id="dn" value={name} onChange={(e) => setName(e.target.value)} placeholder="Table name" />
-        </div>
-        <Button
-          variant="secondary"
-          disabled={busy !== null || name.length < 2}
-          onClick={() => call({ action: "setDisplayName", name })}
-        >
-          Save
-        </Button>
-      </div>
-
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <Label htmlFor="country">Country (ISO-2)</Label>

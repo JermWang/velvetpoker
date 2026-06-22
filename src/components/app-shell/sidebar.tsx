@@ -5,13 +5,13 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const nav = [
-  { href: "/app", label: "Overview" },
-  { href: "/app/lobby", label: "Lobby" },
-  { href: "/app/host", label: "Host a table" },
-  { href: "/app/cashier", label: "Cashier" },
-  { href: "/app/history", label: "History" },
-  { href: "/app/account", label: "Account" },
-  { href: "/app/support", label: "Support" },
+  { href: "/app", label: "Overview", hint: "Your dashboard — balances and quick links." },
+  { href: "/app/lobby", label: "Lobby", hint: "Browse public tables and join a game." },
+  { href: "/app/host", label: "Host a table", hint: "Create your own cash game — public or private invite-only." },
+  { href: "/app/cashier", label: "Cashier", hint: "Deposit and withdraw. Send from your connected wallet." },
+  { href: "/app/history", label: "History", hint: "Past hands and your ledger of wins and losses." },
+  { href: "/app/account", label: "Account", hint: "Profile photo, display name, limits, and verification." },
+  { href: "/app/support", label: "Support", hint: "Rules, help, and responsible-gaming tools." },
 ];
 
 export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
@@ -27,6 +27,7 @@ export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
           <Link
             key={item.href}
             href={item.href}
+            title={item.hint}
             className={cn(
               "rounded-lg px-3 py-2 text-sm transition-colors",
               active

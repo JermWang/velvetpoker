@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConnectButton } from "@/components/auth/connect-button";
+import { HelpHint } from "@/components/ui/tooltip";
 
 export function HostTableForm({
   authed,
@@ -88,7 +89,10 @@ export function HostTableForm({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="asset">Asset</Label>
+              <Label htmlFor="asset" className="inline-flex items-center gap-1.5">
+                Asset
+                <HelpHint label={`Public tables use ${tokenSymbol} only. Private tables can use SOL, USDC, or ${tokenSymbol}.`} />
+              </Label>
               <Select
                 id="asset"
                 name="asset"
@@ -139,7 +143,10 @@ export function HostTableForm({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="visibility">Visibility</Label>
+              <Label htmlFor="visibility" className="inline-flex items-center gap-1.5">
+                Visibility
+                <HelpHint label="Public tables are listed in the lobby for anyone to join. Private tables are reachable only by invite link or code." />
+              </Label>
               <Select
                 id="visibility"
                 name="visibility"

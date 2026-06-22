@@ -197,6 +197,9 @@ model User {
   privyUserId    String         @unique
   email          String?        @unique
   displayName    String?
+  // Short serve path for the user's profile picture (e.g. /api/avatar/<id>?v=..).
+  // The image bytes live in the Avatar table so User reads stay lean.
+  avatarUrl      String?
   role           Role           @default(USER)
   status         UserStatus     @default(ACTIVE)
   kycStatus      KycStatus      @default(NOT_STARTED)
@@ -232,10 +235,22 @@ model User {
 
   referredBy User?  @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals  User[] @relation("Referrals")
+  avatar     Avatar?
 
   @@index([status])
   @@index([kycStatus])
   @@index([referredById])
+}
+
+// Profile picture bytes, kept out of the User row so common User reads stay
+// small. Served by GET /api/avatar/[userId]; uploaded (resized client-side)
+// via POST /api/account/avatar.
+model Avatar {
+  userId      String   @id
+  data        Bytes
+  contentType String
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Wallet {

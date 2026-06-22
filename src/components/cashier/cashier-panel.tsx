@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { HelpHint } from "@/components/ui/tooltip";
 
 export function CashierPanel({
   canPlay,
@@ -65,7 +66,10 @@ export function CashierPanel({
       {/* Deposit */}
       <Card>
         <CardHeader>
-          <CardTitle>Deposit</CardTitle>
+          <CardTitle className="flex items-center gap-1.5">
+            Deposit
+            <HelpHint label="Send funds from the Solana wallet you signed in with. We match the deposit to your account automatically and credit it after on-chain confirmations." />
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-ash">
@@ -99,7 +103,10 @@ export function CashierPanel({
       {/* Withdraw */}
       <Card>
         <CardHeader>
-          <CardTitle>Withdraw</CardTitle>
+          <CardTitle className="flex items-center gap-1.5">
+            Withdraw
+            <HelpHint label="Cash out to any Solana address. Small amounts are sent automatically; larger ones get a quick manual review before sending, for safety." />
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {!canPlay && (
