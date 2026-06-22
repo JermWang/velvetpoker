@@ -3,6 +3,7 @@ import { formatAmount } from "@/lib/ledger/money";
 import type { Asset } from "@/lib/ledger/money";
 import type { WireSeat } from "@/lib/realtime/events";
 import { PlayingCard } from "./playing-card";
+import { Card3D } from "./card-3d";
 import type { Card } from "@/lib/poker/types";
 
 /** Short verb (+ amount where it reads clearly) for a seat's last move. */
@@ -44,6 +45,7 @@ export function Seat({
   clock,
   revealCards,
   handLabel,
+  show3d,
 }: {
   seat: WireSeat;
   asset: Asset;
@@ -57,6 +59,8 @@ export function Seat({
   revealCards?: Card[] | null;
   /** Hand-rank label shown under the pod at showdown (e.g. "Two Pair"). */
   handLabel?: string | null;
+  /** At a contested showdown, flip YOUR hand to the premium 3D card. */
+  show3d?: boolean;
 }) {
   if (!seat.playerId) {
     return (
@@ -91,9 +95,13 @@ export function Seat({
           style={{ filter: "drop-shadow(0 8px 14px rgba(0,0,0,0.45))" }}
         >
           {revealed ? (
-            revealed.map((c) => (
-              <PlayingCard key={c} card={c} size={isYou ? "md" : "sm"} />
-            ))
+            revealed.map((c) =>
+              isYou && show3d ? (
+                <Card3D key={c} card={c} size="md" glow float />
+              ) : (
+                <PlayingCard key={c} card={c} size={isYou ? "md" : "sm"} />
+              ),
+            )
           ) : (
             <>
               <PlayingCard size="sm" faceDown />

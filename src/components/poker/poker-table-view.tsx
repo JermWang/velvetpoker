@@ -406,6 +406,7 @@ export function PokerTableView(props: PokerTableViewProps) {
                   clock={table.toActSeat === s.seat ? clock : null}
                   revealCards={showdownBySeat.get(s.seat)?.cards ?? null}
                   handLabel={showdownBySeat.get(s.seat)?.handDescription ?? null}
+                  show3d={showdownBySeat.size > 0}
                 />
               </div>
             );
