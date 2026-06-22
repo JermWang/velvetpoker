@@ -2,9 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTableSocket } from "@/lib/realtime/use-table-socket";
+import type { ServerEvent } from "@/lib/realtime/events";
 import { formatAmount, parseAmount } from "@/lib/ledger/money";
 import type { Asset } from "@/lib/ledger/money";
 import type { ActionType } from "@/lib/poker/types";
+import {
+  playSound,
+  soundForAction,
+  preloadSounds,
+  setMuted as setSoundMuted,
+} from "@/lib/sound/sound";
 import { Seat } from "./seat";
 import { PlayingCard } from "./playing-card";
 import { ActionBar } from "./action-bar";
@@ -61,10 +68,35 @@ export function PokerTableView(props: PokerTableViewProps) {
   const authQuery =
     props.guestMode && guestId ? `guest=${guestId}` : props.authQuery;
 
+  // Sound effects: play on the moves everyone sees (action applied), on the
+  // deal, and a win flourish at showdown if you took a pot. Gated by the same
+  // mute toggle as the turn alert (synced into the sound module below).
+  const playerTokenRef = useRef<string | null>(null);
+  const onEvent = useCallback((e: ServerEvent) => {
+    switch (e.t) {
+      case "PLAYER_ACTION_APPLIED": {
+        const s = soundForAction(e.action);
+        if (s) playSound(s);
+        break;
+      }
+      case "HAND_STARTED":
+        playSound("deal");
+        break;
+      case "SHOWDOWN": {
+        const me = playerTokenRef.current;
+        if (me && e.results.some((r) => r.playerId === me && Number(r.amountWon) > 0)) {
+          playSound("win");
+        }
+        break;
+      }
+    }
+  }, []);
+
   const { state, send } = useTableSocket({
     wsUrl: props.wsUrl,
     tableId: props.tableId,
     authQuery,
+    onEvent,
   });
   const [chatInput, setChatInput] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
@@ -73,6 +105,7 @@ export function PokerTableView(props: PokerTableViewProps) {
   // the opaque per-table token the server sends (real ids are never broadcast).
   const isSpectator = !props.guestMode && props.youUserId == null;
   const youToken = state.playerToken;
+  playerTokenRef.current = youToken;
   const table = state.table;
   const yourSeat = useMemo(
     () =>
@@ -98,12 +131,17 @@ export function PokerTableView(props: PokerTableViewProps) {
   // persisted mute toggle. The visual cue is the pulsing action bar below.
   const [muted, setMuted] = useState(false);
   useEffect(() => {
+    preloadSounds();
     try {
       setMuted(localStorage.getItem("velvet_mute_turn") === "1");
     } catch {
       /* localStorage unavailable */
     }
   }, []);
+  // One mute governs everything — keep the sound module in sync with the toggle.
+  useEffect(() => {
+    setSoundMuted(muted);
+  }, [muted]);
   const toggleMute = useCallback(() => {
     setMuted((m) => {
       const next = !m;
@@ -187,11 +225,11 @@ export function PokerTableView(props: PokerTableViewProps) {
           <button
             type="button"
             onClick={toggleMute}
-            aria-label={muted ? "Unmute turn alerts" : "Mute turn alerts"}
-            title={muted ? "Turn sound off" : "Turn sound on"}
+            aria-label={muted ? "Unmute table sounds" : "Mute table sounds"}
+            title={muted ? "Sound off" : "Sound on"}
             className="grid h-7 w-7 place-items-center rounded-full border border-white/10 bg-white/5 text-sm text-ash transition-colors hover:text-ivory"
           >
-            {muted ? "🔇" : "🔔"}
+            {muted ? "🔇" : "🔊"}
           </button>
           <VerifyHandDrawer handId={table?.handId ?? null} />
           {seated && (
@@ -208,15 +246,18 @@ export function PokerTableView(props: PokerTableViewProps) {
 
       {/* Felt — an oval table with a leather rail and players seated around the rim */}
       <div
-        className="relative min-h-0 flex-1 overflow-hidden rounded-3xl shadow-elevated"
+        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-3xl shadow-elevated"
         style={{
           background:
             "radial-gradient(120% 90% at 50% 8%, rgba(27,77,58,0.18), transparent 55%), #0c0d10",
         }}
       >
-        <div className="relative mx-auto h-full w-full max-w-5xl">
-          {/* Rail + felt surface */}
-          <div className="pointer-events-none absolute" style={{ inset: "5% 3%" }}>
+        {/* Lock the table to the Claude-design aspect (1180×560) so the oval keeps
+            its proportions instead of stretching to fill the column. */}
+        <div className="relative aspect-[1180/560] max-h-full w-full max-w-5xl">
+          {/* Rail + felt surface — insets match the prototype (18px / 96px on
+              1180×560 ≈ 3.2% vertical, 8.1% horizontal). */}
+          <div className="pointer-events-none absolute" style={{ inset: "3.2% 8.1%" }}>
             <div
               style={{
                 position: "absolute",
@@ -224,7 +265,7 @@ export function PokerTableView(props: PokerTableViewProps) {
                 borderRadius: "50%",
                 background:
                   "linear-gradient(180deg,#2c171b 0%,#1a0d10 60%,#140a0c 100%)",
-                padding: 18,
+                padding: 20,
                 boxSizing: "border-box",
                 boxShadow:
                   "0 44px 90px -38px rgba(0,0,0,0.85), inset 0 2px 0 rgba(255,255,255,0.06), inset 0 0 0 1px rgba(176,58,72,0.26), inset 0 -8px 20px rgba(0,0,0,0.5)",
@@ -233,7 +274,7 @@ export function PokerTableView(props: PokerTableViewProps) {
               <div
                 style={{
                   position: "absolute",
-                  inset: 18,
+                  inset: 20,
                   borderRadius: "50%",
                   overflow: "hidden",
                   background:
@@ -265,7 +306,7 @@ export function PokerTableView(props: PokerTableViewProps) {
                     left: "50%",
                     top: "50%",
                     transform: "translate(-50%,-58%)",
-                    fontSize: 200,
+                    fontSize: 210,
                     color: "rgba(255,255,255,0.022)",
                     lineHeight: 1,
                   }}

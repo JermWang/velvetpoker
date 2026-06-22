@@ -5,6 +5,29 @@ import type { WireSeat } from "@/lib/realtime/events";
 import { PlayingCard } from "./playing-card";
 import type { Card } from "@/lib/poker/types";
 
+/** Short verb (+ amount where it reads clearly) for a seat's last move. */
+function actionLabel(
+  la: NonNullable<WireSeat["lastAction"]>,
+  asset: Asset,
+): string {
+  switch (la.action) {
+    case "CHECK":
+      return "Check";
+    case "CALL":
+      return `Call ${formatAmount(asset, BigInt(la.amount))}`;
+    case "BET":
+      return `Bet ${formatAmount(asset, BigInt(la.amount))}`;
+    case "RAISE":
+      return `Raise ${formatAmount(asset, BigInt(la.amount))}`;
+    case "ALL_IN":
+      return "All-in";
+    case "FOLD":
+      return "Fold";
+    default:
+      return "";
+  }
+}
+
 /**
  * A player position on the rim of the oval table — a tactile pod with a circular
  * avatar, a depleting timer ring for the seat to act, the dealer button, a
@@ -148,6 +171,10 @@ export function Seat({
       {seat.hasFolded ? (
         <span className="mt-1 rounded-md border border-white/8 bg-charcoal-900/85 px-1.5 py-px text-[9px] uppercase tracking-[0.13em] text-ash/80">
           Fold
+        </span>
+      ) : seat.lastAction ? (
+        <span className="mt-1 rounded-md border border-velvet/45 bg-velvet/25 px-2 py-px text-[9px] font-semibold uppercase tracking-[0.1em] text-ivory shadow-sm">
+          {actionLabel(seat.lastAction, asset)}
         </span>
       ) : (
         !seat.inHand && (

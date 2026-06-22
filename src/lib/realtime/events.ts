@@ -37,6 +37,13 @@ export interface WireSeat {
   isAllIn: boolean;
   inHand: boolean;
   sittingOut: boolean;
+  /**
+   * The player's most recent voluntary action in the CURRENT betting round,
+   * surfaced on their pod so everyone can read the prior move. Cleared when the
+   * street advances (round resets) and at the start of each hand. Null = no
+   * action yet this round. Blind posts are not included.
+   */
+  lastAction?: { action: ActionType; amount: string } | null;
   holeCards?: Card[];
 }
 

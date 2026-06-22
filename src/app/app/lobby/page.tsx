@@ -3,17 +3,21 @@ import { prisma } from "@/lib/db/prisma";
 import { TableCard, type TableCardData } from "@/components/lobby/table-card";
 import { JoinPrivate } from "@/components/lobby/join-private";
 import { Button } from "@/components/ui/button";
+import { getAssetPrices } from "@/lib/pricing/prices";
 
 export const dynamic = "force-dynamic";
 
 // Public — no wallet required to browse the lobby or open a table to spectate.
 export default async function LobbyPage() {
-  const tables = await prisma.pokerTable.findMany({
-    where: { visibility: "PUBLIC", status: { in: ["WAITING", "ACTIVE"] } },
-    // Free-play demo first, then cash games ordered low → high roller (by stakes).
-    orderBy: [{ isDemo: "desc" }, { bigBlind: "asc" }, { smallBlind: "asc" }],
-    include: { seats: { where: { status: { not: "EMPTY" } } } },
-  });
+  const [tables, prices] = await Promise.all([
+    prisma.pokerTable.findMany({
+      where: { visibility: "PUBLIC", status: { in: ["WAITING", "ACTIVE"] } },
+      // Free-play demo first, then cash games ordered low → high (by stakes).
+      orderBy: [{ isDemo: "desc" }, { bigBlind: "asc" }, { smallBlind: "asc" }],
+      include: { seats: { where: { status: { not: "EMPTY" } } } },
+    }),
+    getAssetPrices(),
+  ]);
 
   const data: TableCardData[] = tables.map((t) => ({
     id: t.id,
@@ -78,7 +82,7 @@ export default async function LobbyPage() {
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {data.map((t) => (
-              <TableCard key={t.id} table={t} />
+              <TableCard key={t.id} table={t} prices={prices} />
             ))}
           </div>
         )}

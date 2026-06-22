@@ -129,6 +129,13 @@ export class TableRoom {
   private hand: HandState | null = null;
   private handNumber = 0;
   private dealerSeat = 0;
+  // Each seat's most recent voluntary action in the current betting round, keyed
+  // by seat number. Cleared on street advance and at the start of each hand so
+  // the pods show "what they just did this round" and reset every round.
+  private lastActionBySeat = new Map<
+    number,
+    { action: ActionType; amount: bigint }
+  >();
   private serverSeed: string | null = null;
   private serverSeedHash: string | null = null;
   // Pre-committed server seed for the UPCOMING hand (commit-ahead chain): its
@@ -390,6 +397,11 @@ export class TableRoom {
     this.handNumber += 1;
     const handId = `${this.config.tableId}:${this.handNumber}`;
 
+    // Fresh hand: reset per-round action labels and street-change trackers.
+    this.lastActionBySeat.clear();
+    this.lastStreet = "PREFLOP";
+    this.lastCommunityCount = 0;
+
     // Rotate the button to the next eligible seat.
     this.dealerSeat = this.nextDealerSeat(players);
 
@@ -502,6 +514,10 @@ export class TableRoom {
     }
     this.clearTimer();
 
+    // Record this seat's most recent move so every pod shows the prior action
+    // (all action sources — human, bot, timeout — funnel through here).
+    this.lastActionBySeat.set(seat.seat, { action, amount: amount ?? 0n });
+
     this.broadcast({
       t: "PLAYER_ACTION_APPLIED",
       tableId: this.config.tableId,
@@ -534,6 +550,8 @@ export class TableRoom {
     ) {
       this.lastCommunityCount = this.hand.community.length;
       this.lastStreet = this.hand.street;
+      // New betting round — clear everyone's prior-round action labels.
+      this.lastActionBySeat.clear();
       if (this.hand.community.length > 0) {
         this.broadcast({
           t: "COMMUNITY_CARDS",
@@ -726,6 +744,7 @@ export class TableRoom {
       .sort((a, b) => a.seatNumber - b.seatNumber)
       .map((s) => {
         const es = this.hand?.seats.find((x) => x.playerId === s.playerId);
+        const la = this.lastActionBySeat.get(s.seatNumber);
         return {
           seat: s.seatNumber,
           // Opaque per-table token, never the real user id (privacy).
@@ -737,6 +756,9 @@ export class TableRoom {
           isAllIn: es?.isAllIn ?? false,
           inHand: es?.inHand ?? false,
           sittingOut: s.sittingOut,
+          lastAction: la
+            ? { action: la.action, amount: la.amount.toString() }
+            : null,
         };
       });
 

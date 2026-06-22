@@ -25,10 +25,20 @@ export interface UseTableSocketArgs {
   tableId: string;
   /** Query string fragment for auth, e.g. "dev=alice@x.com" or "token=...". */
   authQuery: string;
+  /** Fires for every server event (e.g. to play sound effects). */
+  onEvent?: (e: ServerEvent) => void;
 }
 
-export function useTableSocket({ wsUrl, tableId, authQuery }: UseTableSocketArgs) {
+export function useTableSocket({
+  wsUrl,
+  tableId,
+  authQuery,
+  onEvent,
+}: UseTableSocketArgs) {
   const wsRef = useRef<WebSocket | null>(null);
+  // Keep the latest callback without re-opening the socket when it changes.
+  const onEventRef = useRef(onEvent);
+  onEventRef.current = onEvent;
   const [state, setState] = useState<TableSocketState>({
     connected: false,
     table: null,
@@ -67,6 +77,7 @@ export function useTableSocket({ wsUrl, tableId, authQuery }: UseTableSocketArgs
       } catch {
         return;
       }
+      onEventRef.current?.(event);
       setState((s) => reduce(s, event));
     };
 

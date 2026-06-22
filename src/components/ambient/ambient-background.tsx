@@ -141,7 +141,7 @@ function AmbientCanvas({ intensity }: { intensity: number }) {
     const drawFrame = (t: number) => {
       gctx.clearRect(0, 0, w, h);
       gctx.font = `${CELL}px ui-monospace, "Cascadia Code", "Courier New", monospace`;
-      const baseAlpha = 0.7 * intensity;
+      const baseAlpha = 0.92 * intensity;
       const last = RAMP.length - 1;
       const ccx = cols / 2;
       const ccy = rows / 2;
@@ -160,8 +160,8 @@ function AmbientCanvas({ intensity }: { intensity: number }) {
           if (idx > last) idx = last;
           const ch = RAMP[idx];
           if (!ch || ch === " ") continue;
-          const a = baseAlpha * edge * (0.4 + 0.6 * vc);
-          gctx.fillStyle = `rgba(143,29,44,${a.toFixed(3)})`;
+          const a = baseAlpha * edge * (0.5 + 0.5 * vc);
+          gctx.fillStyle = `rgba(176,58,72,${a.toFixed(3)})`;
           gctx.fillText(ch, c * CELL, r * CELL);
         }
       }
@@ -169,17 +169,17 @@ function AmbientCanvas({ intensity }: { intensity: number }) {
       ctx.clearRect(0, 0, w, h);
       ctx.globalCompositeOperation = "source-over";
       ctx.filter = "none";
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = 1;
       ctx.drawImage(glyph, 0, 0);
-      // glowey bloom — multi-radius "lighter" passes
+      // glowey bloom — multi-radius "lighter" passes (brighter halo)
       ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = 0.62 * intensity;
+      ctx.globalAlpha = 0.85 * intensity;
       ctx.filter = "blur(5px)";
       ctx.drawImage(glyph, 0, 0);
-      ctx.globalAlpha = 0.46 * intensity;
+      ctx.globalAlpha = 0.64 * intensity;
       ctx.filter = "blur(14px)";
       ctx.drawImage(glyph, 0, 0);
-      ctx.globalAlpha = 0.32 * intensity;
+      ctx.globalAlpha = 0.46 * intensity;
       ctx.filter = "blur(30px)";
       ctx.drawImage(glyph, 0, 0);
       ctx.filter = "none";

@@ -2,6 +2,56 @@ import Link from "next/link";
 import { formatAmount, ASSET_SYMBOLS } from "@/lib/ledger/money";
 import type { Asset } from "@/lib/ledger/money";
 import { Button } from "@/components/ui/button";
+import { usdPriceForAsset, type AssetPrices } from "@/lib/pricing/prices";
+
+function usdStr(n: number): string {
+  if (n >= 1000) return `$${Math.round(n).toLocaleString()}`;
+  if (n >= 0.01) return `$${n.toFixed(2)}`;
+  return `$${n.toFixed(4)}`;
+}
+function solStr(n: number): string {
+  return `${n >= 1 ? n.toFixed(2) : n.toFixed(4)} SOL`;
+}
+
+/** Convert a base-unit amount to USD + SOL for display (nulls when unpriced). */
+function convert(
+  amount: bigint,
+  asset: Asset,
+  prices: AssetPrices,
+): { usd: number | null; sol: number | null; native: string } {
+  const native = formatAmount(asset, amount);
+  const dec = Number(native);
+  const up = usdPriceForAsset(asset, prices);
+  const usd = up != null ? dec * up : null;
+  const sol = usd != null && prices.solUsd ? usd / prices.solUsd : null;
+  return { usd, sol, native };
+}
+
+/** Build the USD-primary / SOL-subtext pair for a single value or a range. */
+function priced(
+  parts: Array<{ usd: number | null; sol: number | null; native: string }>,
+  asset: Asset,
+  sep: string,
+): { primary: string; subtext: string | null } {
+  const sym = ASSET_SYMBOLS[asset];
+  // Everything priced → USD primary, SOL subtext.
+  if (parts.every((p) => p.usd != null)) {
+    const primary = parts.map((p) => usdStr(p.usd as number)).join(sep);
+    const subtext = parts.every((p) => p.sol != null)
+      ? `≈ ${parts.map((p) => solStr(p.sol as number)).join(sep)}`
+      : null;
+    return { primary, subtext };
+  }
+  // Token not yet priced → dash, with the token amount as the small reference.
+  if (asset === "TOKEN") {
+    return {
+      primary: "—",
+      subtext: `${parts.map((p) => p.native).join(sep)} ${sym}`,
+    };
+  }
+  // Feed down for SOL/USDC → fall back to the native amount.
+  return { primary: `${parts.map((p) => p.native).join(sep)} ${sym}`, subtext: null };
+}
 
 export interface TableCardData {
   id: string;
@@ -20,9 +70,22 @@ export interface TableCardData {
 
 const SUIT = "♠";
 
-export function TableCard({ table }: { table: TableCardData }) {
+export function TableCard({
+  table,
+  prices,
+}: {
+  table: TableCardData;
+  prices: AssetPrices;
+}) {
   const seats = Array.from({ length: table.maxSeats }, (_, i) => i < table.seatsOccupied);
   const live = table.status === "ACTIVE";
+
+  const sb = convert(table.smallBlind, table.asset, prices);
+  const bb = convert(table.bigBlind, table.asset, prices);
+  const lo = convert(table.minBuyIn, table.asset, prices);
+  const hi = convert(table.maxBuyIn, table.asset, prices);
+  const blinds = priced([sb, bb], table.asset, " / ");
+  const buyIn = priced([lo, hi], table.asset, "–");
 
   return (
     <Link href={`/app/tables/${table.id}`} className="block">
@@ -57,16 +120,14 @@ export function TableCard({ table }: { table: TableCardData }) {
             value={
               table.isDemo
                 ? `${formatAmount(table.asset, table.smallBlind)} / ${formatAmount(table.asset, table.bigBlind)}`
-                : `${formatAmount(table.asset, table.smallBlind)} / ${formatAmount(table.asset, table.bigBlind)} ${ASSET_SYMBOLS[table.asset]}`
+                : blinds.primary
             }
+            subtext={table.isDemo ? null : blinds.subtext}
           />
           <Stat
             label="Buy-in"
-            value={
-              table.isDemo
-                ? "Free"
-                : `${formatAmount(table.asset, table.minBuyIn)}–${formatAmount(table.asset, table.maxBuyIn)} ${ASSET_SYMBOLS[table.asset]}`
-            }
+            value={table.isDemo ? "Free" : buyIn.primary}
+            subtext={table.isDemo ? null : buyIn.subtext}
           />
         </div>
 
@@ -109,11 +170,24 @@ export function TableCard({ table }: { table: TableCardData }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  subtext,
+}: {
+  label: string;
+  value: string;
+  subtext?: string | null;
+}) {
   return (
     <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2">
       <p className="text-[10px] uppercase tracking-[0.2em] text-ash/70">{label}</p>
       <p className="mt-0.5 font-mono text-sm text-ivory">{value}</p>
+      {subtext && (
+        <p className="mt-px font-mono text-[10px] leading-tight text-ash/55">
+          {subtext}
+        </p>
+      )}
     </div>
   );
 }
