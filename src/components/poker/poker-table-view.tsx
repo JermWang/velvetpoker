@@ -108,6 +108,16 @@ export function PokerTableView(props: PokerTableViewProps) {
   const [preAction, setPreAction] = useState<
     null | "fold" | "checkfold" | "check" | "callany"
   >(null);
+  // Portrait/mobile layout: the felt fills the screen as a tall oval and seats
+  // ring it, instead of being squished into the wide desktop table container.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   // Spectator status is fixed by the connection mode; seat identity comes from
   // the opaque per-table token the server sends (real ids are never broadcast).
@@ -312,7 +322,7 @@ export function PokerTableView(props: PokerTableViewProps) {
       >
         {/* Lock the table to the Claude-design aspect (1180×560) so the oval keeps
             its proportions instead of stretching to fill the column. */}
-        <div className="relative aspect-[1180/560] max-h-full w-full max-w-5xl">
+        <div className="relative h-full w-full sm:aspect-[1180/560] sm:h-auto sm:max-h-full sm:max-w-5xl">
           {/* Rail + felt surface — insets match the prototype (18px / 96px on
               1180×560 ≈ 3.2% vertical, 8.1% horizontal). */}
           <div className="pointer-events-none absolute" style={{ inset: "3.2% 8.1%" }}>
@@ -411,6 +421,7 @@ export function PokerTableView(props: PokerTableViewProps) {
             const pos = seatPosition(
               (s.seat - heroSlotAnchor + seatCount) % seatCount,
               seatCount,
+              isMobile,
             );
             const bx = pos.x + (50 - pos.x) * 0.34;
             const by = pos.y + (48 - pos.y) * 0.34;
@@ -435,6 +446,7 @@ export function PokerTableView(props: PokerTableViewProps) {
             const pos = seatPosition(
               (s.seat - heroSlotAnchor + seatCount) % seatCount,
               seatCount,
+              isMobile,
             );
             const winResult = state.lastShowdown?.results.find(
               (r) => r.seat === s.seat && BigInt(r.amountWon) > 0n,
@@ -657,8 +669,18 @@ export function PokerTableView(props: PokerTableViewProps) {
  * Place a seat on the table ellipse. Slot 0 sits at the bottom-center (the
  * hero); the remaining slots fan out clockwise around the rim.
  */
-function seatPosition(slot: number, n: number): { x: number; y: number } {
+function seatPosition(
+  slot: number,
+  n: number,
+  mobile = false,
+): { x: number; y: number } {
   const angle = Math.PI / 2 + (n > 0 ? (slot / n) * Math.PI * 2 : 0);
+  // Desktop is a wide oval (rx > ry). Portrait/mobile is a TALL oval: narrow the
+  // horizontal radius and grow the vertical one so seats ring the upright felt
+  // instead of being crammed onto a squished wide table.
+  if (mobile) {
+    return { x: 50 + 36 * Math.cos(angle), y: 47 + 40 * Math.sin(angle) };
+  }
   // Centred slightly high (48%) so the taller hero cluster at the bottom clears
   // the felt edge. rx leaves room for the ~100px-wide seat clusters at the
   // sides; ry stays modest so a 6-max top seat doesn't clip.
