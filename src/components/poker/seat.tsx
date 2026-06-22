@@ -42,6 +42,8 @@ export function Seat({
   isYou,
   holeCards,
   clock,
+  revealCards,
+  handLabel,
 }: {
   seat: WireSeat;
   asset: Asset;
@@ -51,6 +53,10 @@ export function Seat({
   holeCards?: Card[] | null;
   /** Live action clock for the seat to act; null for every other seat. */
   clock?: { secondsLeft: number; fraction: number } | null;
+  /** Opponent hole cards to flip face-up at showdown (null otherwise). */
+  revealCards?: Card[] | null;
+  /** Hand-rank label shown under the pod at showdown (e.g. "Two Pair"). */
+  handLabel?: string | null;
 }) {
   if (!seat.playerId) {
     return (
@@ -61,7 +67,11 @@ export function Seat({
   }
 
   const urgent = clock != null && clock.secondsLeft <= 5;
-  const revealed = isYou ? holeCards : (seat.holeCards ?? null);
+  const showdownCards = revealCards && revealCards.length ? revealCards : null;
+  const revealed = showdownCards ?? (isYou ? holeCards : (seat.holeCards ?? null));
+  // Show the card row whenever the player is in the hand OR we're revealing at
+  // showdown (their seat may already be flagged out-of-hand by settlement).
+  const showCards = seat.inHand || showdownCards != null;
   const C = 2 * Math.PI * 25; // timer-ring circumference (r = 25)
 
   return (
@@ -72,7 +82,7 @@ export function Seat({
       )}
     >
       {/* Cards — tucked above the avatar, toward the board */}
-      {seat.inHand && (
+      {showCards && (
         <div
           className={cn(
             "relative z-10 mb-[-8px] flex",
@@ -168,7 +178,11 @@ export function Seat({
         </p>
       </div>
 
-      {seat.hasFolded ? (
+      {handLabel ? (
+        <span className="mt-1 max-w-[7rem] truncate rounded-md border border-amber-300/40 bg-amber-300/15 px-2 py-px text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-100 shadow-sm">
+          {handLabel}
+        </span>
+      ) : seat.hasFolded ? (
         <span className="mt-1 rounded-md border border-white/8 bg-charcoal-900/85 px-1.5 py-px text-[9px] uppercase tracking-[0.13em] text-ash/80">
           Fold
         </span>

@@ -5,7 +5,7 @@ import { useTableSocket } from "@/lib/realtime/use-table-socket";
 import type { ServerEvent } from "@/lib/realtime/events";
 import { formatAmount, parseAmount } from "@/lib/ledger/money";
 import type { Asset } from "@/lib/ledger/money";
-import type { ActionType } from "@/lib/poker/types";
+import type { ActionType, Card } from "@/lib/poker/types";
 import {
   playSound,
   soundForAction,
@@ -180,6 +180,18 @@ export function PokerTableView(props: PokerTableViewProps) {
   // seat sits at the bottom-center and opponents fan out around the rim.
   const seatCount = table?.seats.length ?? 0;
   const heroSlotAnchor = yourSeat?.seat ?? 0;
+
+  // Showdown reveals: map each shown seat -> its hole cards + hand rank. Server
+  // only sends cards for a contested showdown, so uncontested wins reveal none.
+  const showdownBySeat = useMemo(() => {
+    const m = new Map<number, { cards: Card[]; handDescription: string }>();
+    for (const r of state.lastShowdown?.results ?? []) {
+      if (r.cards && r.cards.length > 0) {
+        m.set(r.seat, { cards: r.cards, handDescription: r.handDescription });
+      }
+    }
+    return m;
+  }, [state.lastShowdown]);
 
   // The whole table fits one screen: a fixed-height flex column (viewport minus
   // the app header + page padding ≈ 8rem) where the felt absorbs the slack and
@@ -392,6 +404,8 @@ export function PokerTableView(props: PokerTableViewProps) {
                   isYou={s.playerId === youToken}
                   holeCards={s.playerId === youToken ? state.holeCards : null}
                   clock={table.toActSeat === s.seat ? clock : null}
+                  revealCards={showdownBySeat.get(s.seat)?.cards ?? null}
+                  handLabel={showdownBySeat.get(s.seat)?.handDescription ?? null}
                 />
               </div>
             );

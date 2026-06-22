@@ -611,9 +611,12 @@ export class TableRoom {
     this.clearTimer();
     const hand = this.hand;
 
-    // Reveal showdown info.
+    // Reveal showdown info. Hole cards are ONLY revealed at a contested showdown
+    // (two or more hands shown). On an uncontested win — everyone folded to one
+    // player — that player mucks unseen, so we never put their cards on the wire.
     const pub = serializePublicState(hand);
     if (pub.results && pub.results.length > 0) {
+      const contested = pub.results.length > 1;
       this.broadcast({
         t: "SHOWDOWN",
         tableId: this.config.tableId,
@@ -622,8 +625,8 @@ export class TableRoom {
           seat: r.seat,
           playerId: this.tokenFor(r.playerId),
           amountWon: r.amountWon.toString(),
-          handDescription: r.handDescription,
-          cards: r.cards,
+          handDescription: contested ? r.handDescription : "Won uncontested",
+          cards: contested ? r.cards : [],
         })),
       });
     }
