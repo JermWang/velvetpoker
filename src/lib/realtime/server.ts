@@ -23,6 +23,7 @@ import { attachHandPersistence } from "./persistence";
 import { decode, encode, type ServerEvent } from "./events";
 import { verifyWsTicket } from "./ws-ticket";
 import { startBackgroundWorkers } from "@/lib/jobs/worker";
+import { sendOpsAlert } from "@/lib/risk/alert";
 
 interface Client {
   ws: WebSocket;
@@ -518,7 +519,11 @@ export function startServer(
       rl.last = now;
       if (rl.tokens < 1) return; // throttled — drop
       rl.tokens -= 1;
-      void handleEvent(client, raw);
+      // A thrown handler must never become an unhandled rejection (which would
+      // crash this process and the co-located money workers). Log + isolate it.
+      handleEvent(client, raw).catch((e) => {
+        console.error("[ws] handler error", e);
+      });
     };
 
     // Swap the buffering handler for the real one, then replay anything that
@@ -552,6 +557,21 @@ export function startServer(
 
 // Allow running directly: `tsx src/lib/realtime/server.ts`
 if (process.argv[1] && process.argv[1].includes("server")) {
+  // Crash visibility: this process holds live tables AND the on-chain money
+  // workers, so a silent death must be loud. A rejected promise we missed is
+  // logged + alerted but kept alive (don't tear down active tables for one bad
+  // path). A truly uncaught exception leaves state unknown — alert, then exit so
+  // Railway restarts clean.
+  process.on("unhandledRejection", (reason) => {
+    console.error("[ws] unhandledRejection", reason);
+    sendOpsAlert(`ws unhandledRejection: ${String(reason)}`);
+  });
+  process.on("uncaughtException", (err) => {
+    console.error("[ws] uncaughtException", err);
+    sendOpsAlert(`ws uncaughtException: ${err?.message ?? String(err)} — restarting`);
+    setTimeout(() => process.exit(1), 1000);
+  });
+
   startServer();
   // Co-locate the on-chain background workers (deposit monitor, withdrawal
   // processor, reconciliation) in this always-on process. Set

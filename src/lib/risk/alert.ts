@@ -9,6 +9,28 @@
 import type { RiskEventType, RiskSeverity } from "@prisma/client";
 import { env } from "@/lib/env";
 
+/**
+ * Generic operational alert (crashes, worker failures, anything not modeled as a
+ * RiskEvent). Same fire-and-forget contract as sendRiskAlert: never throws,
+ * no-op when ALERT_WEBHOOK_URL is unset.
+ */
+export function sendOpsAlert(message: string): void {
+  const url = env.alertWebhookUrl;
+  if (!url) return;
+  const text = `[velvet][ops] ${message}`.slice(0, 1500);
+  const body = JSON.stringify({ text, content: text });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  void fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body,
+    signal: controller.signal,
+  })
+    .catch(() => {})
+    .finally(() => clearTimeout(timer));
+}
+
 export function sendRiskAlert(params: {
   type: RiskEventType;
   severity: RiskSeverity;
