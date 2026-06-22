@@ -276,6 +276,11 @@ export class TableRoom {
     if (seat) seat.connected = connected;
   }
 
+  /** Current table stack for a seated player (0 if not seated). */
+  stackOf(playerId: string): bigint {
+    return this.findSeatByPlayer(playerId)?.stack ?? 0n;
+  }
+
   // ---- hand lifecycle ----------------------------------------------------
 
   private eligiblePlayers(): RoomSeat[] {
@@ -300,7 +305,8 @@ export class TableRoom {
   // ---- bots (demo tables only) ------------------------------------------
 
   /** Target seated players to keep a free-play table lively for a lone human. */
-  private static readonly DEMO_TARGET_PLAYERS = 3;
+  // Keep demo tables feeling alive — fill close to full (capped by maxSeats).
+  private static readonly DEMO_TARGET_PLAYERS = 5;
 
   private isBotSeat(s: RoomSeat): boolean {
     return isBotId(s.playerId);

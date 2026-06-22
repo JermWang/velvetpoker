@@ -318,6 +318,53 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
     case "SIT_OUT":
       room.setSitOut(userId, event.sitOut);
       break;
+    case "REBUY": {
+      // Top up chips between hands. Demo = free chips; real = lock more funds.
+      if (!room.hasPlayer(userId)) {
+        sendTo(client, { t: "ERROR", message: "Take a seat first" });
+        break;
+      }
+      if (room.isInActiveHand(userId)) {
+        sendTo(client, { t: "ERROR", message: "You can rebuy once the hand finishes" });
+        break;
+      }
+      const table = await prisma.pokerTable.findUnique({
+        where: { id: event.tableId },
+      });
+      if (!table) break;
+      // Clamp so the resulting stack never exceeds the table's max buy-in.
+      const current = room.stackOf(userId);
+      const room2max = table.maxBuyIn - current;
+      let amount = BigInt(event.amount);
+      if (amount > room2max) amount = room2max;
+      if (amount <= 0n) {
+        sendTo(client, { t: "ERROR", message: "You're already at the max stack" });
+        break;
+      }
+      if (entry.isDemo) {
+        room.topUp(userId, amount);
+        room.setSitOut(userId, false); // re-activate a busted player
+        break;
+      }
+      try {
+        await lockBuyIn({
+          userId,
+          asset: table.asset,
+          amount,
+          tableId: table.id,
+          correlationId: `rebuy:${userId}:${Date.now()}`,
+        });
+      } catch (err) {
+        sendTo(client, {
+          t: "ERROR",
+          message: err instanceof Error ? err.message : "Rebuy failed",
+        });
+        break;
+      }
+      room.topUp(userId, amount);
+      room.setSitOut(userId, false);
+      break;
+    }
     case "SUBMIT_CLIENT_SEED":
       room.submitClientSeed(userId, event.seed);
       break;

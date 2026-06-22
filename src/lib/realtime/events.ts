@@ -14,6 +14,7 @@ export type ClientEvent =
   | { t: "JOIN_TABLE"; tableId: string; password?: string }
   | { t: "LEAVE_TABLE"; tableId: string }
   | { t: "SIT_OUT"; tableId: string; sitOut: boolean }
+  | { t: "REBUY"; tableId: string; amount: string }
   | {
       t: "BUY_IN";
       tableId: string;

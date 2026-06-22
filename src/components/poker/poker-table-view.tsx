@@ -20,6 +20,7 @@ import { BuyInPanel } from "./buy-in-panel";
 import { VerifyHandDrawer } from "./verify-hand-drawer";
 import { Button } from "@/components/ui/button";
 import { ConnectButton } from "@/components/auth/connect-button";
+import { cn } from "@/lib/utils";
 
 export interface PokerTableViewProps {
   tableId: string;
@@ -103,6 +104,10 @@ export function PokerTableView(props: PokerTableViewProps) {
   });
   const [chatInput, setChatInput] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
+  // Pre-action ("act ahead of turn") — applied automatically when it's our turn.
+  const [preAction, setPreAction] = useState<
+    null | "fold" | "checkfold" | "check" | "callany"
+  >(null);
 
   // Spectator status is fixed by the connection mode; seat identity comes from
   // the opaque per-table token the server sends (real ids are never broadcast).
@@ -166,6 +171,38 @@ export function PokerTableView(props: PokerTableViewProps) {
       /* ignore parse errors; the field guides format */
     }
   }
+
+  function toggleSitOut() {
+    if (!yourSeat) return;
+    send({ t: "SIT_OUT", tableId: props.tableId, sitOut: !yourSeat.sittingOut });
+  }
+
+  function rebuyToMax() {
+    if (!yourSeat) return;
+    const add = BigInt(props.maxBuyIn) - BigInt(yourSeat.stack);
+    if (add > 0n) {
+      send({ t: "REBUY", tableId: props.tableId, amount: add.toString() });
+    }
+  }
+
+  // Apply an armed pre-action the moment it becomes our turn (then disarm).
+  useEffect(() => {
+    if (!isYourTurn || preAction === null) return;
+    const toCall = state.toCall;
+    let chosen: ActionType | null = null;
+    if (preAction === "fold") chosen = "FOLD";
+    else if (preAction === "checkfold") chosen = toCall === 0n ? "CHECK" : "FOLD";
+    else if (preAction === "check") chosen = toCall === 0n ? "CHECK" : null;
+    else if (preAction === "callany") chosen = toCall === 0n ? "CHECK" : "CALL";
+    setPreAction(null);
+    if (chosen) act(chosen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isYourTurn, preAction, state.toCall]);
+
+  // Disarm pre-actions at the start of each hand so nothing carries over stale.
+  useEffect(() => {
+    setPreAction(null);
+  }, [table?.handId]);
 
   // Demo tables use free chips; real tables are labeled by their asset symbol.
   const unit = props.demo ? "chips" : ASSET_SYMBOLS[props.asset];
@@ -238,6 +275,21 @@ export function PokerTableView(props: PokerTableViewProps) {
             {muted ? "🔇" : "🔊"}
           </button>
           <VerifyHandDrawer handId={table?.handId ?? null} />
+          {seated && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={toggleSitOut}
+              title={yourSeat?.sittingOut ? "Return to play" : "Sit out the next hand"}
+            >
+              {yourSeat?.sittingOut ? "I'm back" : "Sit out"}
+            </Button>
+          )}
+          {seated && BigInt(yourSeat?.stack ?? "0") < BigInt(props.maxBuyIn) && (
+            <Button size="sm" variant="ghost" onClick={rebuyToMax} title="Top up to the max stack">
+              Add chips
+            </Button>
+          )}
           {seated && (
             <Button
               size="sm"
@@ -478,15 +530,51 @@ export function PokerTableView(props: PokerTableViewProps) {
             secondsLeft={clock?.secondsLeft ?? null}
             onAction={act}
           />
+        ) : seated && BigInt(yourSeat!.stack) === 0n ? (
+          <div className="rounded-2xl border border-velvet/30 bg-velvet/[0.06] p-3 text-center">
+            <p className="text-sm text-ivory">You&apos;re out of chips.</p>
+            <Button size="sm" className="mt-2" onClick={rebuyToMax}>
+              {props.demo ? "Get more free chips" : "Rebuy"}
+            </Button>
+          </div>
         ) : (
-          <p className="rounded-2xl border border-white/10 bg-charcoal-800/60 py-3 text-center text-sm text-ash">
-            {table?.toActSeat != null
-              ? `Waiting on ${
-                  table.seats.find((s) => s.seat === table.toActSeat)?.displayName ??
-                  `seat ${table.toActSeat + 1}`
-                }…`
-              : "Waiting for the next hand…"}
-          </p>
+          <div className="space-y-2">
+            {/* Pre-action: queue your move before it's your turn. */}
+            {yourSeat?.inHand && !yourSeat.sittingOut && (
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {(
+                  [
+                    ["checkfold", "Check/Fold"],
+                    ["check", "Check"],
+                    ["callany", "Call any"],
+                    ["fold", "Fold"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setPreAction((p) => (p === key ? null : key))}
+                    className={cn(
+                      "rounded-lg border px-2.5 py-1 text-xs transition-colors",
+                      preAction === key
+                        ? "border-velvet bg-velvet/25 text-ivory"
+                        : "border-white/12 text-ash hover:text-ivory",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="rounded-2xl border border-white/10 bg-charcoal-800/60 py-3 text-center text-sm text-ash">
+              {table?.toActSeat != null
+                ? `Waiting on ${
+                    table.seats.find((s) => s.seat === table.toActSeat)?.displayName ??
+                    `seat ${table.toActSeat + 1}`
+                  }…`
+                : "Waiting for the next hand…"}
+            </p>
+          </div>
         )}
         {state.error && (
           <p className="mt-1 text-center text-sm text-red-300">{state.error}</p>
