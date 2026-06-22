@@ -62,17 +62,12 @@ function fbm(x: number, y: number): number {
 }
 
 export function AmbientBackground({ intensity = 1 }: { intensity?: number }) {
-  // Decorative only. Skip on small screens, where the tracery reads as visual
-  // noise behind a dense game UI — a clean dark background is far calmer.
-  const [show, setShow] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 640px)");
-    const update = () => setShow(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-  if (!show) return null;
+  // Client-only: there's no reason to SSR an animated canvas, so mount it after
+  // hydration. Renders on every screen size (including mobile) — the radial
+  // center-fade keeps content clean while the tracery lives in the outskirts.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
   return <AmbientCanvas intensity={intensity} />;
 }
 
