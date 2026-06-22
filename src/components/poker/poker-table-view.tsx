@@ -43,24 +43,24 @@ export interface PokerTableViewProps {
   voiceEnabled?: boolean;
 }
 
-/** A milled velvet poker chip rendered in pure CSS (striped edge + face rings). */
+/** The branded velvet poker chip (black + gold "V"), from /public. */
 function Chip({ size = 20 }: { size?: number }) {
   return (
-    <span
-      style={{ position: "relative", display: "inline-block", width: size, height: size }}
-    >
-      <span
-        style={{
-          position: "absolute",
-          inset: 0,
-          borderRadius: "50%",
-          background:
-            "conic-gradient(from 0deg,#8f1d2c 0 30deg,#efe9df 30deg 60deg,#8f1d2c 60deg 90deg,#efe9df 90deg 120deg,#8f1d2c 120deg 150deg,#efe9df 150deg 180deg,#8f1d2c 180deg 210deg,#efe9df 210deg 240deg,#8f1d2c 240deg 270deg,#efe9df 270deg 300deg,#8f1d2c 300deg 330deg,#efe9df 330deg 360deg)",
-          boxShadow:
-            "0 -3px 0 -1px #6f1521, 0 -5px 0 -2px #8f1d2c, inset 0 0 0 2px rgba(255,255,255,0.14), inset 0 0 0 3px #b03a48",
-        }}
-      />
-    </span>
+    <img
+      src="/velvet-poker-chip.png"
+      alt=""
+      aria-hidden
+      width={size}
+      height={size}
+      draggable={false}
+      style={{
+        display: "inline-block",
+        width: size,
+        height: size,
+        objectFit: "contain",
+        filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.45))",
+      }}
+    />
   );
 }
 
@@ -760,9 +760,10 @@ function seatPosition(
   // horizontal radius and grow the vertical one so seats ring the upright felt
   // instead of being crammed onto a squished wide table.
   if (mobile) {
-    // Slightly tighter vertical radius + a touch lower centre so the top seats'
-    // cards clear the felt edge.
-    return { x: 50 + 36 * Math.cos(angle), y: 48 + 36 * Math.sin(angle) };
+    // A tall, elongated oval (not a circle): narrow the horizontal radius so
+    // side seats don't crowd, and stretch the vertical radius so seats spread
+    // down the length of the felt. Reads far less cluttered on a phone.
+    return { x: 50 + 31 * Math.cos(angle), y: 47 + 41 * Math.sin(angle) };
   }
   // Centred slightly high (48%) so the taller hero cluster at the bottom clears
   // the felt edge. rx leaves room for the ~100px-wide seat clusters at the
