@@ -198,10 +198,8 @@ export function TableCard({
             {seats.map((filled, i) => (
               <span
                 key={i}
-                className={`grid h-5 w-5 place-items-center rounded-full text-[10px] ${
-                  filled
-                    ? "border border-velvet/40 bg-velvet/15 text-velvet"
-                    : "border border-white/10 text-ash/40"
+                className={`grid h-5 w-5 place-items-center rounded-full border border-white/70 text-[10px] ${
+                  filled ? "bg-velvet/15 text-velvet" : "text-ash/40"
                 }`}
               >
                 {filled ? SUIT : ""}
