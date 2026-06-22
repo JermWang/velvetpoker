@@ -4,41 +4,51 @@ import type { Asset } from "@/lib/ledger/money";
 import { Button } from "@/components/ui/button";
 import { usdPriceForAsset, type AssetPrices } from "@/lib/pricing/prices";
 
-function usdStr(n: number): string {
-  if (n >= 1000) return `$${Math.round(n).toLocaleString()}`;
-  if (n >= 0.01) return `$${n.toFixed(2)}`;
-  return `$${n.toFixed(4)}`;
+// USD is the headline: clean whole dollars (with commas) at $1+, two decimals
+// only for sub-dollar micro stakes so blinds stay distinct.
+function fmtUsd(n: number): string {
+  return n >= 1 ? `$${Math.round(n).toLocaleString("en-US")}` : `$${n.toFixed(2)}`;
 }
-function solStr(n: number): string {
-  return `${n >= 1 ? n.toFixed(2) : n.toFixed(4)} SOL`;
+// The USD value as actually shown (rounded), so the SOL line is its exact translation.
+function shownUsd(n: number): number {
+  return n >= 1 ? Math.round(n) : Math.round(n * 100) / 100;
+}
+// SOL translation of the headline USD — tidy, ~2 significant figures, no noise.
+function fmtSol(n: number): string {
+  if (n <= 0) return "0";
+  if (n >= 1) {
+    const r = Math.round(n * 10) / 10;
+    return Number.isInteger(r) ? r.toFixed(0) : r.toFixed(1);
+  }
+  if (n >= 0.01) return n.toFixed(2);
+  return n.toFixed(4);
 }
 
-/** Convert a base-unit amount to USD + SOL for display (nulls when unpriced). */
+/** Convert a base-unit amount to a USD value for display (null when unpriced). */
 function convert(
   amount: bigint,
   asset: Asset,
   prices: AssetPrices,
-): { usd: number | null; sol: number | null; native: string } {
+): { usd: number | null; native: string } {
   const native = formatAmount(asset, amount);
-  const dec = Number(native);
   const up = usdPriceForAsset(asset, prices);
-  const usd = up != null ? dec * up : null;
-  const sol = usd != null && prices.solUsd ? usd / prices.solUsd : null;
-  return { usd, sol, native };
+  const usd = up != null ? Number(native) * up : null;
+  return { usd, native };
 }
 
-/** Build the USD-primary / SOL-subtext pair for a single value or a range. */
+/** Build the USD-headline / SOL-translation pair for a single value or a range. */
 function priced(
-  parts: Array<{ usd: number | null; sol: number | null; native: string }>,
+  parts: Array<{ usd: number | null; native: string }>,
   asset: Asset,
   sep: string,
+  solUsd: number | null,
 ): { primary: string; subtext: string | null } {
   const sym = ASSET_SYMBOLS[asset];
-  // Everything priced → USD primary, SOL subtext.
+  // Everything priced → whole-dollar USD headline; SOL derived FROM the shown USD.
   if (parts.every((p) => p.usd != null)) {
-    const primary = parts.map((p) => usdStr(p.usd as number)).join(sep);
-    const subtext = parts.every((p) => p.sol != null)
-      ? `≈ ${parts.map((p) => solStr(p.sol as number)).join(sep)}`
+    const primary = parts.map((p) => fmtUsd(p.usd as number)).join(sep);
+    const subtext = solUsd
+      ? `≈ ${parts.map((p) => fmtSol(shownUsd(p.usd as number) / solUsd)).join(sep)} SOL`
       : null;
     return { primary, subtext };
   }
@@ -84,8 +94,8 @@ export function TableCard({
   const bb = convert(table.bigBlind, table.asset, prices);
   const lo = convert(table.minBuyIn, table.asset, prices);
   const hi = convert(table.maxBuyIn, table.asset, prices);
-  const blinds = priced([sb, bb], table.asset, " / ");
-  const buyIn = priced([lo, hi], table.asset, "–");
+  const blinds = priced([sb, bb], table.asset, " / ", prices.solUsd);
+  const buyIn = priced([lo, hi], table.asset, "–", prices.solUsd);
 
   return (
     <Link href={`/app/tables/${table.id}`} className="block">
@@ -180,13 +190,13 @@ function Stat({
   subtext?: string | null;
 }) {
   return (
-    <div className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2">
-      <p className="text-[10px] uppercase tracking-[0.2em] text-ash/70">{label}</p>
-      <p className="mt-0.5 font-mono text-sm text-ivory">{value}</p>
+    <div className="rounded-lg bg-white/[0.025] px-3 py-2.5">
+      <p className="text-[9px] uppercase tracking-[0.22em] text-ash/55">{label}</p>
+      <p className="mt-1 text-[15px] font-semibold leading-none text-ivory">
+        {value}
+      </p>
       {subtext && (
-        <p className="mt-px font-mono text-[10px] leading-tight text-ash/55">
-          {subtext}
-        </p>
+        <p className="mt-1.5 text-[10px] leading-none text-ash/45">{subtext}</p>
       )}
     </div>
   );

@@ -42,11 +42,11 @@ export interface HouseRoom {
 }
 
 // Token-denominated public rooms (whole-token stakes). Blinds escalate ~5x/tier.
+// Kept to three tiers + the free-play demo = four lobbies total.
 export const HOUSE_ROOMS: HouseRoom[] = [
   { code: "HOUSE-MICRO", name: "Velvet — Micro", sb: token(10), bb: token(20) },
   { code: "HOUSE-LOW", name: "Velvet — Low", sb: token(50), bb: token(100) },
   { code: "HOUSE-MID", name: "Velvet — Mid", sb: token(250), bb: token(500) },
-  { code: "HOUSE-HIGH", name: "Velvet — High", sb: token(1000), bb: token(2000) },
 ];
 
 // Free-play demo table: free chips, no real money, open to wallet-less guests.
@@ -93,6 +93,13 @@ async function upsertRoom(
 export async function seedHouseRooms(): Promise<number> {
   // The free-play demo room always seeds (no real money).
   await upsertRoom(DEMO_ROOM, true, "SOL");
+
+  // Prune any house room no longer in the set (e.g. retired high-stakes tiers),
+  // so re-running the seed converges to exactly the rooms defined here.
+  const keep = ["DEMO-FREEPLAY", ...HOUSE_ROOMS.map((r) => r.code)];
+  await prisma.pokerTable.deleteMany({
+    where: { inviteCode: { startsWith: "HOUSE-" }, NOT: { inviteCode: { in: keep } } },
+  });
 
   // Real public rooms are token-denominated and require the token to be set.
   if (!isTokenConfigured()) {
