@@ -47,3 +47,9 @@ yarn-error.log*
 
 # local validation output
 /anchor-validation.out.txt
+
+# hot wallet secret backup (never commit)
+.hot-wallet-secret.txt
+wallets.local.txt
+.treasury.tmp
+.treasury-secret.txt

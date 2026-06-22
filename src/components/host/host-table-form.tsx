@@ -7,12 +7,42 @@ import { Input, Label, Select } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConnectButton } from "@/components/auth/connect-button";
 
-export function HostTableForm({ authed }: { authed: boolean }) {
+export function HostTableForm({
+  authed,
+  tokenConfigured,
+  tokenSymbol,
+}: {
+  authed: boolean;
+  tokenConfigured: boolean;
+  tokenSymbol: string;
+}) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [asset, setAsset] = useState("SOL");
-  const [visibility, setVisibility] = useState("PUBLIC");
+  // Public tables must use the token; private tables may use SOL/USDC/token.
+  const [visibility, setVisibility] = useState(
+    tokenConfigured ? "PUBLIC" : "PRIVATE",
+  );
+  const [asset, setAsset] = useState(tokenConfigured ? "TOKEN" : "SOL");
+
+  // Asset options allowed for the current visibility.
+  const assetOptions =
+    visibility === "PUBLIC"
+      ? [{ value: "TOKEN", label: tokenSymbol }]
+      : [
+          { value: "SOL", label: "SOL" },
+          { value: "USDC", label: "USDC" },
+          ...(tokenConfigured
+            ? [{ value: "TOKEN", label: tokenSymbol }]
+            : []),
+        ];
+
+  function onVisibilityChange(next: string) {
+    setVisibility(next);
+    // Force a valid asset for the new visibility (public ⇒ token only).
+    if (next === "PUBLIC") setAsset("TOKEN");
+    else if (asset === "TOKEN" && !tokenConfigured) setAsset("SOL");
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -64,10 +94,19 @@ export function HostTableForm({ authed }: { authed: boolean }) {
                 name="asset"
                 value={asset}
                 onChange={(e) => setAsset(e.target.value)}
+                disabled={visibility === "PUBLIC"}
               >
-                <option value="SOL">SOL</option>
-                <option value="USDC">USDC</option>
+                {assetOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </Select>
+              {visibility === "PUBLIC" && (
+                <p className="mt-1 text-xs text-ash/70">
+                  Public tables are {tokenSymbol}-only.
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="maxSeats">Table size</Label>
@@ -105,9 +144,11 @@ export function HostTableForm({ authed }: { authed: boolean }) {
                 id="visibility"
                 name="visibility"
                 value={visibility}
-                onChange={(e) => setVisibility(e.target.value)}
+                onChange={(e) => onVisibilityChange(e.target.value)}
               >
-                <option value="PUBLIC">Public — listed in the lobby</option>
+                <option value="PUBLIC" disabled={!tokenConfigured}>
+                  Public — listed in the lobby{!tokenConfigured ? " (token not set)" : ""}
+                </option>
                 <option value="PRIVATE">Private — invite only</option>
               </Select>
             </div>

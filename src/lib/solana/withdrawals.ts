@@ -253,14 +253,34 @@ async function failWithdrawal(withdrawalId: string, note: string): Promise<void>
 const VELOCITY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function velocityAmountCap(asset: Asset): bigint {
-  return asset === "SOL"
-    ? env.withdrawalDailyMaxLamports
-    : env.withdrawalDailyMaxUsdc;
+  switch (asset) {
+    case "SOL":
+      return env.withdrawalDailyMaxLamports;
+    case "USDC":
+      return env.withdrawalDailyMaxUsdc;
+    case "TOKEN":
+      // 0 means "no amount cap" -> effectively unbounded for this asset.
+      return env.withdrawalDailyMaxToken > 0n
+        ? env.withdrawalDailyMaxToken
+        : MAX_BIGINT;
+  }
 }
 
 function aboveReviewThreshold(asset: Asset, amount: bigint): boolean {
-  if (asset === "SOL") return amount >= env.minWithdrawalReviewLamports;
-  // USDC threshold: treat the same numeric magnitude scaled to 6 decimals as a
-  // reasonable default (e.g. >= 1000 USDC). Configurable later.
-  return amount >= 1_000_000_000n; // 1000 USDC in base units
+  switch (asset) {
+    case "SOL":
+      return amount >= env.minWithdrawalReviewLamports;
+    case "USDC":
+      // USDC threshold: ~1000 USDC (6dp). Configurable later.
+      return amount >= 1_000_000_000n;
+    case "TOKEN":
+      // 0 means "never force review on amount alone" (count velocity still applies).
+      return (
+        env.minWithdrawalReviewToken > 0n &&
+        amount >= env.minWithdrawalReviewToken
+      );
+  }
 }
+
+/** Sentinel "no cap" — larger than any realistic withdrawal. */
+const MAX_BIGINT = 2n ** 96n;

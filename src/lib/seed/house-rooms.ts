@@ -4,13 +4,28 @@
  * stable inviteCode so re-running updates rather than duplicates. All take the
  * 3% house rake (split three ways: team / buyback / referrals).
  *
- * Buy-ins are derived from the big blind: min 40bb, max 200bb.
+ * Public tables are token-only, so the house rooms are denominated in the
+ * custom token (decimals from NEXT_PUBLIC_TOKEN_DECIMALS). Stakes below are in
+ * WHOLE TOKENS — adjust to taste. Buy-ins are derived from the big blind:
+ * min 40bb, max 200bb.
  */
 
 import { prisma } from "@/lib/db/prisma";
 import { DEFAULT_RAKE_BPS } from "@/lib/poker/rake";
+import { env, isTokenConfigured } from "@/lib/env";
 
-/** SOL amount (decimal) -> lamports. */
+/** Whole-token amount -> base units, using the configured token decimals. */
+function token(n: number): bigint {
+  const decimals = BigInt(env.tokenDecimals);
+  // Integer math: split whole/fraction to avoid float base-unit drift.
+  const parts = n.toString().split(".");
+  const whole = parts[0] ?? "0";
+  const frac = parts[1] ?? "";
+  const fracPadded = frac.padEnd(Number(decimals), "0").slice(0, Number(decimals));
+  return BigInt(whole) * 10n ** decimals + BigInt(fracPadded || "0");
+}
+
+/** SOL amount (decimal) -> lamports (used only by the free-play demo room). */
 function sol(n: number): bigint {
   return BigInt(Math.round(n * 1e9));
 }
@@ -26,15 +41,16 @@ export interface HouseRoom {
   bb: bigint;
 }
 
-// Blinds escalate ~5x per tier.
+// Token-denominated public rooms (whole-token stakes). Blinds escalate ~5x/tier.
 export const HOUSE_ROOMS: HouseRoom[] = [
-  { code: "HOUSE-MICRO", name: "Velvet — Micro", sb: sol(0.001), bb: sol(0.002) },
-  { code: "HOUSE-LOW", name: "Velvet — Low", sb: sol(0.005), bb: sol(0.01) },
-  { code: "HOUSE-MID", name: "Velvet — Mid", sb: sol(0.025), bb: sol(0.05) },
-  { code: "HOUSE-HIGH", name: "Velvet — High", sb: sol(0.1), bb: sol(0.2) },
+  { code: "HOUSE-MICRO", name: "Velvet — Micro", sb: token(10), bb: token(20) },
+  { code: "HOUSE-LOW", name: "Velvet — Low", sb: token(50), bb: token(100) },
+  { code: "HOUSE-MID", name: "Velvet — Mid", sb: token(250), bb: token(500) },
+  { code: "HOUSE-HIGH", name: "Velvet — High", sb: token(1000), bb: token(2000) },
 ];
 
 // Free-play demo table: free chips, no real money, open to wallet-less guests.
+// Stays SOL-denominated — it's nominal (free chips), exempt from the token rule.
 const DEMO_ROOM: HouseRoom = {
   code: "DEMO-FREEPLAY",
   name: "Velvet — Free Play",
@@ -42,7 +58,11 @@ const DEMO_ROOM: HouseRoom = {
   bb: sol(0.02),
 };
 
-async function upsertRoom(r: HouseRoom, isDemo: boolean): Promise<void> {
+async function upsertRoom(
+  r: HouseRoom,
+  isDemo: boolean,
+  asset: "SOL" | "TOKEN",
+): Promise<void> {
   const minBuyIn = r.bb * MIN_BUYIN_BB;
   const maxBuyIn = r.bb * MAX_BUYIN_BB;
   const fields = {
@@ -59,19 +79,28 @@ async function upsertRoom(r: HouseRoom, isDemo: boolean): Promise<void> {
     where: { inviteCode: r.code },
     create: {
       ...fields,
-      asset: "SOL",
+      asset,
       maxSeats: 6,
       inviteCode: r.code,
       actionTimeoutSeconds: 30,
       spectatorsAllowed: true,
       isDemo,
     },
-    update: { ...fields, isDemo },
+    update: { ...fields, asset, isDemo },
   });
 }
 
 export async function seedHouseRooms(): Promise<number> {
-  await upsertRoom(DEMO_ROOM, true);
-  for (const r of HOUSE_ROOMS) await upsertRoom(r, false);
+  // The free-play demo room always seeds (no real money).
+  await upsertRoom(DEMO_ROOM, true, "SOL");
+
+  // Real public rooms are token-denominated and require the token to be set.
+  if (!isTokenConfigured()) {
+    console.warn(
+      "[seed] TOKEN_MINT not set — skipping token house rooms. Set the token env and re-run `npm run seed:rooms`.",
+    );
+    return 1; // just the demo
+  }
+  for (const r of HOUSE_ROOMS) await upsertRoom(r, false, "TOKEN");
   return HOUSE_ROOMS.length + 1; // + the free-play demo table
 }

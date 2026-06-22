@@ -7,7 +7,7 @@ import { writeAuditLog } from "@/lib/auth/audit";
 import { tooMany } from "@/lib/security/rate-limit";
 
 const schema = z.object({
-  asset: z.enum(["SOL", "USDC"]),
+  asset: z.enum(["SOL", "USDC", "TOKEN"]),
   amount: z.string(),
   toAddress: z.string().min(32).max(64),
 });

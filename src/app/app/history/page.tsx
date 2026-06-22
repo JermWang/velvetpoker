@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/auth/require-user";
 import { prisma } from "@/lib/db/prisma";
-import { formatAmount } from "@/lib/ledger/money";
+import { formatAmount, ASSET_SYMBOLS } from "@/lib/ledger/money";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -52,7 +52,7 @@ export default async function HistoryPage() {
                     <td className="py-2 text-ivory">{r.handDescription}</td>
                     <td className="py-2 text-right font-mono text-ivory">
                       {formatAmount(r.hand.table.asset, r.amountWon)}{" "}
-                      {r.hand.table.asset}
+                      {ASSET_SYMBOLS[r.hand.table.asset]}
                     </td>
                   </tr>
                 ))}
@@ -91,7 +91,7 @@ export default async function HistoryPage() {
                     </td>
                     <td className="py-2 text-right font-mono text-ivory">
                       {e.direction === "DEBIT" ? "−" : "+"}
-                      {formatAmount(e.asset, e.amount)} {e.asset}
+                      {formatAmount(e.asset, e.amount)} {ASSET_SYMBOLS[e.asset]}
                     </td>
                   </tr>
                 ))}

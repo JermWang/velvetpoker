@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth/require-user";
 import { HostTableForm } from "@/components/host/host-table-form";
+import { env, isTokenConfigured } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,11 @@ export default async function HostPage() {
           are reachable by invite link or code.
         </p>
       </div>
-      <HostTableForm authed={Boolean(user)} />
+      <HostTableForm
+        authed={Boolean(user)}
+        tokenConfigured={isTokenConfigured()}
+        tokenSymbol={env.tokenSymbol}
+      />
     </div>
   );
 }

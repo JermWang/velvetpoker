@@ -6,10 +6,11 @@ import { parseAmount } from "@/lib/ledger/money";
 import { generateInviteCode, hashPassword } from "@/lib/crypto";
 import { writeAuditLog } from "@/lib/auth/audit";
 import { tooMany } from "@/lib/security/rate-limit";
+import { isTokenConfigured, env } from "@/lib/env";
 
 const createSchema = z.object({
   name: z.string().min(2).max(40),
-  asset: z.enum(["SOL", "USDC"]),
+  asset: z.enum(["SOL", "USDC", "TOKEN"]),
   maxSeats: z.union([z.literal(2), z.literal(6), z.literal(9)]),
   smallBlind: z.string(),
   bigBlind: z.string(),
@@ -43,6 +44,25 @@ export async function POST(req: Request) {
     );
   }
   const c = parsed.data;
+
+  // Asset/visibility policy:
+  //  - PUBLIC tables may ONLY be denominated in the custom token.
+  //  - PRIVATE tables may use SOL, USDC, or the token.
+  //  - The token is only selectable once its mint is configured.
+  if ((c.asset === "TOKEN") && !isTokenConfigured()) {
+    return NextResponse.json(
+      { error: "Token play is not available yet" },
+      { status: 400 },
+    );
+  }
+  if (c.visibility === "PUBLIC" && c.asset !== "TOKEN") {
+    return NextResponse.json(
+      {
+        error: `Public tables must use ${env.tokenSymbol}. Choose SOL or USDC only for private tables.`,
+      },
+      { status: 400 },
+    );
+  }
 
   try {
     const asset = c.asset;

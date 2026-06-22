@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { formatAmount, type Asset } from "@/lib/ledger/money";
+import { formatAmount, ASSET_SYMBOLS, type Asset } from "@/lib/ledger/money";
 
 interface AssetBalance {
   asset: Asset;
@@ -56,7 +56,7 @@ export function ReferralPanel({
     }
     const parts = Object.entries(json.claimed as Record<string, string>)
       .filter(([, v]) => BigInt(v) > 0n)
-      .map(([asset, v]) => `${formatAmount(asset as Asset, BigInt(v))} ${asset}`);
+      .map(([asset, v]) => `${formatAmount(asset as Asset, BigInt(v))} ${ASSET_SYMBOLS[asset as Asset]}`);
     setMessage(
       parts.length
         ? `Claimed ${parts.join(" + ")} into your available balance.`
@@ -104,7 +104,7 @@ export function ReferralPanel({
           label="Lifetime earned"
           value={balances
             .filter((b) => BigInt(b.totalEarned) > 0n)
-            .map((b) => `${formatAmount(b.asset, BigInt(b.totalEarned))} ${b.asset}`)
+            .map((b) => `${formatAmount(b.asset, BigInt(b.totalEarned))} ${ASSET_SYMBOLS[b.asset]}`)
             .join("  ·  ") || "—"}
         />
       </div>
@@ -117,9 +117,9 @@ export function ReferralPanel({
         <div className="mt-2 space-y-1">
           {balances.map((b) => (
             <div key={b.asset} className="flex items-center justify-between text-sm">
-              <span className="text-ash">{b.asset}</span>
+              <span className="text-ash">{ASSET_SYMBOLS[b.asset]}</span>
               <span className="font-mono text-ivory">
-                {formatAmount(b.asset, BigInt(b.claimable))} {b.asset}
+                {formatAmount(b.asset, BigInt(b.claimable))} {ASSET_SYMBOLS[b.asset]}
               </span>
             </div>
           ))}

@@ -2,7 +2,8 @@ import { requireUser } from "@/lib/auth/require-user";
 import { prisma } from "@/lib/db/prisma";
 import { getUserBalances } from "@/lib/queries";
 import { canPlayRealMoney } from "@/lib/compliance/gates";
-import { formatAmount } from "@/lib/ledger/money";
+import { formatAmount, ASSET_SYMBOLS } from "@/lib/ledger/money";
+import { env, isTokenConfigured } from "@/lib/env";
 import { CashierPanel } from "@/components/cashier/cashier-panel";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
@@ -36,7 +37,7 @@ export default async function CashierPage() {
         {balances.map((b) => (
           <Card key={b.asset}>
             <CardContent className="flex items-baseline justify-between py-5">
-              <span className="text-sm text-ash">{b.asset}</span>
+              <span className="text-sm text-ash">{ASSET_SYMBOLS[b.asset]}</span>
               <span className="font-mono text-xl text-ivory">
                 {formatAmount(b.asset, b.available)}
               </span>
@@ -45,7 +46,11 @@ export default async function CashierPage() {
         ))}
       </div>
 
-      <CashierPanel canPlay={canPlayRealMoney(user)} />
+      <CashierPanel
+        canPlay={canPlayRealMoney(user)}
+        tokenConfigured={isTokenConfigured()}
+        tokenSymbol={env.tokenSymbol}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -58,7 +63,7 @@ export default async function CashierPage() {
                 {deposits.map((d) => (
                   <li key={d.id} className="flex items-center justify-between py-2 text-sm">
                     <span className="font-mono text-ivory">
-                      {formatAmount(d.asset, d.amount)} {d.asset}
+                      {formatAmount(d.asset, d.amount)} {ASSET_SYMBOLS[d.asset]}
                     </span>
                     <StatusBadge status={d.status} />
                   </li>
@@ -77,7 +82,7 @@ export default async function CashierPage() {
                 {withdrawals.map((w) => (
                   <li key={w.id} className="flex items-center justify-between py-2 text-sm">
                     <span className="font-mono text-ivory">
-                      {formatAmount(w.asset, w.amount)} {w.asset}
+                      {formatAmount(w.asset, w.amount)} {ASSET_SYMBOLS[w.asset]}
                     </span>
                     <StatusBadge status={w.status} />
                   </li>

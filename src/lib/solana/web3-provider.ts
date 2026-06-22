@@ -47,12 +47,25 @@ const MEMO_PROGRAM_ID = new PublicKey(
 export class Web3SolanaProvider implements SolanaProvider {
   readonly name = "web3";
   private connection: Connection;
-  private usdcMint: PublicKey;
+  /** SPL mints we watch/transfer, keyed by asset. SOL is native (no mint). */
+  private splMints: Partial<Record<Asset, PublicKey>>;
+  /** Reverse lookup: mint base58 -> asset, for deposit detection. */
+  private assetByMint: Map<string, Asset>;
   private hotWallet: Keypair | null;
 
   constructor(connection: Connection) {
     this.connection = connection;
-    this.usdcMint = new PublicKey(env.usdcMint);
+    this.splMints = { USDC: new PublicKey(env.usdcMint) };
+    // The custom token is optional until its mint is configured.
+    if (env.tokenMint) {
+      this.splMints.TOKEN = new PublicKey(env.tokenMint);
+    }
+    this.assetByMint = new Map(
+      Object.entries(this.splMints).map(([asset, mint]) => [
+        mint.toBase58(),
+        asset as Asset,
+      ]),
+    );
     this.hotWallet = loadHotWallet();
   }
 
@@ -114,12 +127,14 @@ export class Web3SolanaProvider implements SolanaProvider {
         }
       }
 
-      // --- USDC (SPL): positive token-balance delta for owner + mint ---
+      // --- SPL tokens (USDC + custom TOKEN): positive token-balance delta for
+      //     owner, matched to the asset by mint ---
       const pre = tx.meta.preTokenBalances ?? [];
       const post = tx.meta.postTokenBalances ?? [];
       for (const p of post) {
         if (p.owner !== address) continue;
-        if (p.mint !== this.usdcMint.toBase58()) continue;
+        const asset = this.assetByMint.get(p.mint);
+        if (!asset) continue;
         const before = pre.find((x) => x.accountIndex === p.accountIndex);
         const beforeAmt = BigInt(before?.uiTokenAmount.amount ?? "0");
         const afterAmt = BigInt(p.uiTokenAmount.amount ?? "0");
@@ -129,7 +144,7 @@ export class Web3SolanaProvider implements SolanaProvider {
             txSignature: info.signature,
             toAddress: address,
             fromAddress: keys[0] ?? null,
-            asset: "USDC",
+            asset,
             amount: delta,
             confirmations,
             slot: info.slot,
@@ -165,15 +180,19 @@ export class Web3SolanaProvider implements SolanaProvider {
       return { txSignature: sig };
     }
 
-    // USDC (SPL) transfer.
+    // SPL transfer (USDC or the custom TOKEN).
+    const mint = this.splMints[params.asset];
+    if (!mint) {
+      throw new Error(`No SPL mint configured for asset ${params.asset}`);
+    }
     const fromAta = await getAssociatedTokenAddress(
-      this.usdcMint,
+      mint,
       this.hotWallet.publicKey,
     );
     const toAta = await getOrCreateAssociatedTokenAccount(
       this.connection,
       this.hotWallet,
-      this.usdcMint,
+      mint,
       to,
     );
     const tx = new Transaction().add(

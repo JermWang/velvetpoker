@@ -9,11 +9,26 @@
  *    done with integer string math so there is no floating point intermediary.
  */
 
-export type Asset = "SOL" | "USDC";
+export type Asset = "SOL" | "USDC" | "TOKEN";
+
+// Custom token decimals/symbol come from NEXT_PUBLIC_ env so this module works
+// identically on the server and in the client bundle (Next inlines NEXT_PUBLIC_
+// at build time). Defaults keep dev/tests working before the token is set.
+const TOKEN_DECIMALS =
+  Number(process.env.NEXT_PUBLIC_TOKEN_DECIMALS ?? "9") || 9;
+export const TOKEN_SYMBOL = process.env.NEXT_PUBLIC_TOKEN_SYMBOL || "TOKEN";
 
 export const ASSET_DECIMALS: Record<Asset, number> = {
   SOL: 9,
   USDC: 6,
+  TOKEN: TOKEN_DECIMALS,
+};
+
+/** Display ticker for an asset (SOL/USDC literal; TOKEN uses the configured symbol). */
+export const ASSET_SYMBOLS: Record<Asset, string> = {
+  SOL: "SOL",
+  USDC: "USDC",
+  TOKEN: TOKEN_SYMBOL,
 };
 
 export const LAMPORTS_PER_SOL = 1_000_000_000n;
@@ -91,9 +106,9 @@ export function formatAmount(asset: Asset, amount: bigint): string {
   return formatBaseUnitsToDecimal(amount, ASSET_DECIMALS[asset]);
 }
 
-/** Human-friendly label, e.g. "1.5 SOL" or "25 USDC". */
+/** Human-friendly label, e.g. "1.5 SOL", "25 USDC", or "100 VELVET". */
 export function formatAmountWithSymbol(asset: Asset, amount: bigint): string {
-  return `${formatAmount(asset, amount)} ${asset}`;
+  return `${formatAmount(asset, amount)} ${ASSET_SYMBOLS[asset]}`;
 }
 
 /** Clamp helper used by betting math; all inputs/outputs are bigint. */

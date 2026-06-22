@@ -6,7 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function CashierPanel({ canPlay }: { canPlay: boolean }) {
+export function CashierPanel({
+  canPlay,
+  tokenConfigured,
+  tokenSymbol,
+}: {
+  canPlay: boolean;
+  tokenConfigured: boolean;
+  tokenSymbol: string;
+}) {
   const router = useRouter();
   const [address, setAddress] = useState<string | null>(null);
   const [loadingAddr, setLoadingAddr] = useState(false);
@@ -61,7 +69,8 @@ export function CashierPanel({ canPlay }: { canPlay: boolean }) {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-ash">
-            Send SOL or USDC (SPL) to the deposit address below{" "}
+            Send SOL, USDC{tokenConfigured ? `, or ${tokenSymbol}` : ""} (SPL)
+            to the deposit address below{" "}
             <span className="text-ivory">from your connected wallet</span>. Your
             deposit is matched to your account by the sending wallet, then
             credited after on-chain confirmations.
@@ -109,6 +118,9 @@ export function CashierPanel({ canPlay }: { canPlay: boolean }) {
               >
                 <option value="SOL">SOL</option>
                 <option value="USDC">USDC</option>
+                {tokenConfigured && (
+                  <option value="TOKEN">{tokenSymbol}</option>
+                )}
               </Select>
             </div>
             <div>

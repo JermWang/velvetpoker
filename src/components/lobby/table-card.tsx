@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatAmount } from "@/lib/ledger/money";
+import { formatAmount, ASSET_SYMBOLS } from "@/lib/ledger/money";
 import type { Asset } from "@/lib/ledger/money";
 import { Button } from "@/components/ui/button";
 
@@ -39,7 +39,7 @@ export function TableCard({ table }: { table: TableCardData }) {
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5">
             <span className="rounded-full border border-velvet/30 bg-velvet/10 px-2.5 py-0.5 text-xs font-medium text-velvet">
-              {table.isDemo ? "FREE" : table.asset}
+              {table.isDemo ? "FREE" : ASSET_SYMBOLS[table.asset]}
             </span>
             <span className="flex items-center gap-1 text-[11px] text-ash">
               <span
@@ -57,7 +57,7 @@ export function TableCard({ table }: { table: TableCardData }) {
             value={
               table.isDemo
                 ? `${formatAmount(table.asset, table.smallBlind)} / ${formatAmount(table.asset, table.bigBlind)}`
-                : `${formatAmount(table.asset, table.smallBlind)} / ${formatAmount(table.asset, table.bigBlind)} ${table.asset}`
+                : `${formatAmount(table.asset, table.smallBlind)} / ${formatAmount(table.asset, table.bigBlind)} ${ASSET_SYMBOLS[table.asset]}`
             }
           />
           <Stat
@@ -65,7 +65,7 @@ export function TableCard({ table }: { table: TableCardData }) {
             value={
               table.isDemo
                 ? "Free"
-                : `${formatAmount(table.asset, table.minBuyIn)}–${formatAmount(table.asset, table.maxBuyIn)} ${table.asset}`
+                : `${formatAmount(table.asset, table.minBuyIn)}–${formatAmount(table.asset, table.maxBuyIn)} ${ASSET_SYMBOLS[table.asset]}`
             }
           />
         </div>

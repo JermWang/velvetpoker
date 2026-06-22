@@ -37,6 +37,13 @@ export const env = {
   // SPL mint for USDC. Mainnet default; override for devnet/test mints.
   usdcMint:
     optional("USDC_MINT") ?? "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  // Custom SPL token (the house token). The MINT is server-only; decimals and
+  // symbol are NEXT_PUBLIC_ so the client can format/display token amounts.
+  // Empty mint = token not configured yet (public/token tables are disabled
+  // until it's set). Public (non-demo) tables may only use this token.
+  tokenMint: optional("TOKEN_MINT") ?? "",
+  tokenDecimals: Number(optional("NEXT_PUBLIC_TOKEN_DECIMALS") ?? "9"),
+  tokenSymbol: optional("NEXT_PUBLIC_TOKEN_SYMBOL") ?? "TOKEN",
   adminEmails: (optional("ADMIN_EMAILS") ?? "")
     .split(",")
     .map((s) => s.trim().toLowerCase())
@@ -59,6 +66,15 @@ export const env = {
   ),
   withdrawalDailyMaxUsdc: BigInt(
     optional("WITHDRAWAL_DAILY_MAX_USDC") ?? "5000000000", // 5000 USDC (6dp)
+  ),
+  // Custom token withdrawal gating (base units). Defaults are deliberately
+  // permissive on amount (token value is unknown); the per-day count still
+  // applies. Tune once the token's market value is known.
+  minWithdrawalReviewToken: BigInt(
+    optional("MIN_WITHDRAWAL_REVIEW_TOKEN") ?? "0", // 0 = never force review on amount alone
+  ),
+  withdrawalDailyMaxToken: BigInt(
+    optional("WITHDRAWAL_DAILY_MAX_TOKEN") ?? "0", // 0 = no per-asset amount cap
   ),
   // Optional outbound webhook for HIGH/CRITICAL risk alerts (Slack/Discord/
   // generic JSON). Unset = alerts are recorded to the DB only.
@@ -86,4 +102,9 @@ export function isAdminEmail(email: string | null | undefined): boolean {
 export function isAdminWallet(address: string | null | undefined): boolean {
   if (!address) return false;
   return env.adminWallets.includes(address);
+}
+
+/** True once the custom SPL token mint is configured (token play enabled). */
+export function isTokenConfigured(): boolean {
+  return env.tokenMint.length > 0;
 }

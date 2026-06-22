@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
-import { formatAmount } from "@/lib/ledger/money";
+import { formatAmount, ASSET_SYMBOLS } from "@/lib/ledger/money";
 import type { Asset } from "@/lib/ledger/money";
 
 export function BuyInPanel({
@@ -44,7 +44,7 @@ export function BuyInPanel({
       <h3 className="font-display text-lg text-ivory">Take a seat</h3>
       <p className="mt-1 text-sm text-ash">
         Buy in between {formatAmount(asset, minBuyIn)} and{" "}
-        {formatAmount(asset, maxBuyIn)} {asset}.
+        {formatAmount(asset, maxBuyIn)} {ASSET_SYMBOLS[asset]}.
       </p>
       <div className="mt-4 text-left">
         <Label htmlFor="buyin">Buy-in amount</Label>

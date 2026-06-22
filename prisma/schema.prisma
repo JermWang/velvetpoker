@@ -46,6 +46,10 @@ enum GeofenceStatus {
 enum Asset {
   SOL
   USDC
+  // Custom SPL token. Mint/decimals/symbol are configured via env
+  // (TOKEN_MINT, NEXT_PUBLIC_TOKEN_DECIMALS, NEXT_PUBLIC_TOKEN_SYMBOL).
+  // Public (non-demo) tables may ONLY be denominated in TOKEN.
+  TOKEN
 }
 
 enum Chain {
