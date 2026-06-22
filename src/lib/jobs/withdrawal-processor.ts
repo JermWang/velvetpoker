@@ -18,8 +18,9 @@ export async function runWithdrawalProcessorOnce(): Promise<{ sent: number; fail
   let failed = 0;
   for (const w of approved) {
     try {
-      await sendApprovedWithdrawal(w.id);
-      sent++;
+      const res = await sendApprovedWithdrawal(w.id);
+      // Empty signature = the row was claimed/sent elsewhere (no-op, not a send).
+      if (res.txSignature) sent++;
     } catch (err) {
       failed++;
       console.error(`[withdrawal-processor] ${w.id} failed`, err);

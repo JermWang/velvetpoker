@@ -279,8 +279,11 @@ export class TableRoom {
   // ---- hand lifecycle ----------------------------------------------------
 
   private eligiblePlayers(): RoomSeat[] {
+    // Disconnected players are NOT dealt into a new hand — otherwise they'd bleed
+    // blinds while unable to act. They rejoin the next hand on reconnect. (Bots
+    // are always "connected".)
     return [...this.seats.values()]
-      .filter((s) => !s.sittingOut && s.stack > 0n)
+      .filter((s) => !s.sittingOut && s.stack > 0n && s.connected)
       .sort((a, b) => a.seatNumber - b.seatNumber);
   }
 
@@ -597,6 +600,33 @@ export class TableRoom {
     }, this.config.actionTimeoutSeconds * 1000);
   }
 
+  /**
+   * On reconnect mid-hand, re-send the player's private cards and — if it's
+   * their turn — the action prompt with the REMAINING deadline (no timer reset),
+   * so a page refresh doesn't blind them into a timeout-fold.
+   */
+  resyncPlayer(playerId: string): void {
+    if (!this.hand) return;
+    const seat = this.hand.seats.find((s) => s.playerId === playerId);
+    if (!seat || !seat.inHand) return;
+    this.send(playerId, {
+      t: "PRIVATE_CARDS",
+      tableId: this.config.tableId,
+      handId: this.hand.handId,
+      cards: seat.holeCards,
+    });
+    if (this.hand.toActSeat === seat.seat && this.actionDeadline) {
+      this.send(playerId, {
+        t: "ACTION_REQUIRED",
+        tableId: this.config.tableId,
+        seat: seat.seat,
+        toCall: amountToCall(this.hand, seat).toString(),
+        minRaiseTo: minRaiseTo(this.hand).toString(),
+        deadline: this.actionDeadline,
+      });
+    }
+  }
+
   private onActionTimeout(playerId: string): void {
     if (!this.hand) return;
     const seat = this.hand.seats.find((s) => s.playerId === playerId);
@@ -716,12 +746,14 @@ export class TableRoom {
       serverSeed: this.serverSeed ?? "",
       potAmount: hand.totalPot,
       rake,
+      // Persist hole cards ONLY for a contested showdown — an uncontested win
+      // mucks unseen, so the winner's cards are never stored (matches the wire).
       results: (pub.results ?? []).map((r) => ({
         seat: r.seat,
         playerId: r.playerId,
         amountWon: r.amountWon,
         handDescription: r.handDescription,
-        cards: r.cards,
+        cards: (pub.results?.length ?? 0) > 1 ? r.cards : [],
       })),
       actions: hand.actionLog.map((a) => ({
         seat: a.seat,

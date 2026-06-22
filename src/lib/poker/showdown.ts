@@ -12,13 +12,6 @@ import { compareHands, evaluateHand } from "./evaluator";
 import { calculateSidePots } from "./side-pots";
 import type { Card, HandRanking, HandResult, HandState, SeatState } from "./types";
 
-export interface SettleOptions {
-  /** Rake in basis points (1% = 100 bps). Capped, integer math only. */
-  rakeBps?: number;
-  /** Hard cap on total rake taken this hand (chip units). */
-  rakeCap?: bigint;
-}
-
 interface SeatEval {
   seat: number;
   ranking: HandRanking | null; // null if folded / not eligible to show
@@ -27,11 +20,13 @@ interface SeatEval {
 /**
  * Settle the hand. Mutates seat stacks (awards winnings) and returns per-seat
  * results. Also sets state.results, state.totalPot, marks complete.
+ *
+ * Rake is intentionally NOT applied here — it is the single responsibility of
+ * the table room (computeRake in src/lib/poker/rake.ts), which honors the
+ * "no flop, no drop" rule and the big-blind cap. Keeping one rake path avoids
+ * a second, divergent implementation.
  */
-export function settleHand(
-  state: HandState,
-  options: SettleOptions = {},
-): HandResult[] {
+export function settleHand(state: HandState): HandResult[] {
   const community = state.community;
   const pots = calculateSidePots(state.seats);
 
@@ -50,22 +45,8 @@ export function settleHand(
   const winnings = new Map<number, bigint>();
   const descriptions = new Map<number, string>();
 
-  let totalRake = 0n;
-  const rakeBps = BigInt(Math.max(0, Math.floor(options.rakeBps ?? 0)));
-
   for (const pot of pots) {
-    let potAmount = pot.amount;
-
-    // Rake only from contested pots that actually go to showdown / are won.
-    if (rakeBps > 0n && pot.eligibleSeats.length > 0) {
-      let rake = (potAmount * rakeBps) / 10_000n;
-      if (options.rakeCap !== undefined) {
-        const remainingCap = options.rakeCap - totalRake;
-        if (rake > remainingCap) rake = remainingCap < 0n ? 0n : remainingCap;
-      }
-      potAmount -= rake;
-      totalRake += rake;
-    }
+    const potAmount = pot.amount;
 
     const winners = determineWinners(pot.eligibleSeats, evals);
     if (winners.length === 0) continue;

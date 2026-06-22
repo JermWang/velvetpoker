@@ -50,6 +50,10 @@ export default async function CashierPage() {
         canPlay={canPlayRealMoney(user)}
         tokenConfigured={isTokenConfigured()}
         tokenSymbol={env.tokenSymbol}
+        available={balances.map((b) => ({
+          asset: b.asset,
+          amount: formatAmount(b.asset, b.available),
+        }))}
       />
 
       <div className="grid gap-6 lg:grid-cols-2">

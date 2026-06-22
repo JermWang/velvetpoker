@@ -15,6 +15,9 @@ import { WebSocketServer, type WebSocket } from "ws";
 import { prisma } from "@/lib/db/prisma";
 import { env } from "@/lib/env";
 import { lockBuyIn, cashOutSeat } from "@/lib/ledger/ledger";
+import { canPlayRealMoney } from "@/lib/compliance/gates";
+import { verifyPassword } from "@/lib/crypto";
+import { formatAmount } from "@/lib/ledger/money";
 import { TableRoom, type RoomConfig } from "./table-room";
 import { attachHandPersistence } from "./persistence";
 import { decode, encode, type ServerEvent } from "./events";
@@ -203,6 +206,8 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
         playerToken: room.identityToken(userId),
       });
       room.sendTableState(userId);
+      // Reconnect mid-hand: re-send this player's hole cards + turn prompt.
+      room.resyncPlayer(userId);
       break;
     }
     case "REQUEST_TABLE_STATE":
@@ -241,6 +246,37 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
           displayName: client.displayName,
           seatNumber,
           stack,
+        });
+        break;
+      }
+
+      // ---- Server-authoritative gates (the page checks are UX only) ----------
+      // The table must be open for buy-ins.
+      if (table.status !== "WAITING" && table.status !== "ACTIVE") {
+        sendTo(client, { t: "ERROR", message: "This table isn't open for buy-ins" });
+        break;
+      }
+      // Compliance / responsible-gaming (geo, age, KYC, self-exclusion, status).
+      const buyInUser = await prisma.user.findUnique({ where: { id: userId } });
+      if (!buyInUser || !canPlayRealMoney(buyInUser)) {
+        sendTo(client, {
+          t: "ERROR",
+          message: "Your account can't join real-money play right now. See Account.",
+        });
+        break;
+      }
+      // Private-table password.
+      if (table.visibility === "PRIVATE" && table.passwordHash) {
+        if (!event.password || !verifyPassword(event.password, table.passwordHash)) {
+          sendTo(client, { t: "ERROR", message: "Incorrect table password" });
+          break;
+        }
+      }
+      // Buy-in must be within the table's configured range.
+      if (amount < table.minBuyIn || amount > table.maxBuyIn) {
+        sendTo(client, {
+          t: "ERROR",
+          message: `Buy-in must be between ${formatAmount(table.asset, table.minBuyIn)} and ${formatAmount(table.asset, table.maxBuyIn)} ${table.asset}`,
         });
         break;
       }

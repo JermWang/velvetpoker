@@ -288,15 +288,20 @@ function applyAggressive(
 
   if (newLevel > prevBet) {
     state.currentBet = newLevel;
-    // A full raise reopens the action and resets the minimum raise size.
-    // (MVP rule: any increase reopens; exact sub-min all-in lock is a TODO.)
-    if (raiseDelta >= state.lastRaiseSize) {
+    // A FULL raise (>= the last raise size) reopens betting: everyone still in
+    // gets to act again and may re-raise. A short all-in (less than a full
+    // raise) raises the amount others must match but does NOT reopen the
+    // betting — players who already acted may only call or fold, not re-raise
+    // (enforced in validateAction via hasActedThisStreet). nextToAct still
+    // forces them to match the new level (committedThisStreet < currentBet).
+    const isFullRaise = raiseDelta >= state.lastRaiseSize;
+    if (isFullRaise) {
       state.lastRaiseSize = raiseDelta;
-    }
-    state.lastAggressorSeat = seat.seat;
-    for (const s of state.seats) {
-      if (s.seat !== seat.seat && s.inHand && !s.hasFolded && !s.isAllIn) {
-        s.hasActedThisStreet = false;
+      state.lastAggressorSeat = seat.seat;
+      for (const s of state.seats) {
+        if (s.seat !== seat.seat && s.inHand && !s.hasFolded && !s.isAllIn) {
+          s.hasActedThisStreet = false;
+        }
       }
     }
   }
@@ -343,7 +348,7 @@ function finish(state: HandState): void {
     }
   }
   state.toActSeat = null;
-  settleHand(state, {});
+  settleHand(state);
   recomputePots(state);
 }
 

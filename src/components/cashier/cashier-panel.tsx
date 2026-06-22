@@ -11,25 +11,53 @@ export function CashierPanel({
   canPlay,
   tokenConfigured,
   tokenSymbol,
+  available,
 }: {
   canPlay: boolean;
   tokenConfigured: boolean;
   tokenSymbol: string;
+  /** Available (withdrawable) balance per asset, as decimal strings. */
+  available: Array<{ asset: string; amount: string }>;
 }) {
   const router = useRouter();
   const [address, setAddress] = useState<string | null>(null);
   const [loadingAddr, setLoadingAddr] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [addrError, setAddrError] = useState<string | null>(null);
   const [wAsset, setWAsset] = useState("SOL");
+  const [wAmount, setWAmount] = useState("");
   const [wSubmitting, setWSubmitting] = useState(false);
   const [wMessage, setWMessage] = useState<string | null>(null);
   const [wError, setWError] = useState<string | null>(null);
 
+  const label = (a: string) => (a === "TOKEN" ? tokenSymbol : a);
+  const availableFor = (a: string) =>
+    available.find((b) => b.asset === a)?.amount ?? "0";
+
+  async function copyAddress() {
+    if (!address) return;
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* clipboard unavailable — user can select manually */
+    }
+  }
+
   async function getAddress() {
     setLoadingAddr(true);
-    const res = await fetch("/api/cashier/deposit-address", { method: "POST" });
-    const json = await res.json();
-    setLoadingAddr(false);
-    if (res.ok) setAddress(json.address);
+    setAddrError(null);
+    try {
+      const res = await fetch("/api/cashier/deposit-address", { method: "POST" });
+      const json = await res.json();
+      if (res.ok) setAddress(json.address);
+      else setAddrError(json.error ?? "Couldn't load a deposit address");
+    } catch {
+      setAddrError("Couldn't load a deposit address");
+    } finally {
+      setLoadingAddr(false);
+    }
   }
 
   async function withdraw(e: React.FormEvent<HTMLFormElement>) {
@@ -43,7 +71,7 @@ export function CashierPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         asset: wAsset,
-        amount: String(form.get("amount") ?? ""),
+        amount: wAmount,
         toAddress: String(form.get("toAddress") ?? ""),
       }),
     });
@@ -81,7 +109,16 @@ export function CashierPanel({
           </p>
           {address ? (
             <div className="rounded-xl border border-white/10 bg-charcoal-900/60 p-4">
-              <p className="text-xs text-ash">Velvet deposit address</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-ash">Velvet deposit address</p>
+                <button
+                  type="button"
+                  onClick={copyAddress}
+                  className="rounded-md border border-white/12 px-2 py-0.5 text-xs text-ash transition-colors hover:text-ivory"
+                >
+                  {copied ? "Copied ✓" : "Copy"}
+                </button>
+              </div>
               <p className="mt-1 break-all font-mono text-sm text-ivory">
                 {address}
               </p>
@@ -91,6 +128,7 @@ export function CashierPanel({
               {loadingAddr ? "Loading…" : "Show deposit address"}
             </Button>
           )}
+          {addrError && <p className="text-xs text-red-300">{addrError}</p>}
           <p className="text-xs text-ash/70">
             Deposit only from the Solana wallet you signed in with — funds sent
             from another wallet can&apos;t be matched to your account
@@ -131,8 +169,28 @@ export function CashierPanel({
               </Select>
             </div>
             <div>
-              <Label htmlFor="amount">Amount</Label>
-              <Input id="amount" name="amount" placeholder="0.5" required />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="amount">Amount</Label>
+                <span className="text-xs text-ash/80">
+                  Available: {availableFor(wAsset)} {label(wAsset)}
+                  <button
+                    type="button"
+                    onClick={() => setWAmount(availableFor(wAsset))}
+                    className="ml-2 rounded border border-white/12 px-1.5 py-px text-[10px] text-velvet hover:text-ivory"
+                  >
+                    Max
+                  </button>
+                </span>
+              </div>
+              <Input
+                id="amount"
+                name="amount"
+                placeholder="0.5"
+                inputMode="decimal"
+                value={wAmount}
+                onChange={(e) => setWAmount(e.target.value)}
+                required
+              />
             </div>
             <div>
               <Label htmlFor="toAddress">Destination address</Label>

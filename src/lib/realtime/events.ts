@@ -14,7 +14,14 @@ export type ClientEvent =
   | { t: "JOIN_TABLE"; tableId: string; password?: string }
   | { t: "LEAVE_TABLE"; tableId: string }
   | { t: "SIT_OUT"; tableId: string; sitOut: boolean }
-  | { t: "BUY_IN"; tableId: string; amount: string; seatNumber?: number }
+  | {
+      t: "BUY_IN";
+      tableId: string;
+      amount: string;
+      seatNumber?: number;
+      /** Required to sit at a password-protected private table. */
+      password?: string;
+    }
   | {
       t: "PLAYER_ACTION";
       tableId: string;

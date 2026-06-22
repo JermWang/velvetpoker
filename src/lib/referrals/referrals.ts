@@ -12,6 +12,7 @@
 import { randomInt } from "node:crypto";
 import type { Asset } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { isTokenConfigured } from "@/lib/env";
 
 // Unambiguous alphabet (no 0/O/1/I) for hand-shareable codes.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -87,7 +88,9 @@ export interface ReferralSummary {
   balances: ReferralAssetBalance[];
 }
 
-const TRACKED_ASSETS: Asset[] = ["SOL", "USDC"];
+const TRACKED_ASSETS: Asset[] = isTokenConfigured()
+  ? ["SOL", "USDC", "TOKEN"]
+  : ["SOL", "USDC"];
 
 /** Everything the profile referral panel needs. */
 export async function getReferralSummary(userId: string): Promise<ReferralSummary> {

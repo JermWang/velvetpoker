@@ -17,6 +17,12 @@ export async function GET(
     status: 200,
     headers: {
       "Content-Type": avatar.contentType,
+      // Defense-in-depth against content sniffing / stored-XSS via a crafted
+      // "image": never let the browser reinterpret these bytes as HTML/JS, and
+      // sandbox them with a no-execution CSP.
+      "X-Content-Type-Options": "nosniff",
+      "Content-Disposition": "inline",
+      "Content-Security-Policy": "default-src 'none'; sandbox",
       // URLs are cache-busted with ?v= on change, so cache aggressively.
       "Cache-Control": "public, max-age=86400, immutable",
     },

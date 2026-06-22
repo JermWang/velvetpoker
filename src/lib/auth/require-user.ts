@@ -59,17 +59,22 @@ export async function getCurrentUser(): Promise<User | null> {
   }
 
   // Persist the linked Solana wallet(s) for cashier/withdrawal UX and audit.
+  // Binding is IMMUTABLE: a wallet is never silently re-assigned to a different
+  // user, since deposit attribution is by sender address — re-binding would let
+  // one account hijack another's deposits.
   for (const address of identity.wallets) {
-    await prisma.wallet.upsert({
+    const existing = await prisma.wallet.findUnique({
       where: { chain_address: { chain: "SOLANA", address } },
-      create: {
-        userId: user.id,
-        chain: "SOLANA",
-        address,
-        type: "EMBEDDED",
-      },
-      update: { userId: user.id },
     });
+    if (!existing) {
+      await prisma.wallet.create({
+        data: { userId: user.id, chain: "SOLANA", address, type: "EMBEDDED" },
+      });
+    } else if (existing.userId !== user.id) {
+      console.warn(
+        `[auth] wallet ${address} is already bound to another user; refusing to re-bind`,
+      );
+    }
   }
 
   return user;

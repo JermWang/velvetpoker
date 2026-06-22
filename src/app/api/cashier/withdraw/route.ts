@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { PublicKey } from "@solana/web3.js";
 import { getCurrentUser } from "@/lib/auth/require-user";
 import { parseAmount } from "@/lib/ledger/money";
 import { requestWithdrawal } from "@/lib/solana/withdrawals";
@@ -25,6 +26,18 @@ export async function POST(req: Request) {
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  // Reject a malformed destination up front (a bad address would otherwise lock
+  // funds, fail on send, then refund — validate before we ever lock).
+  try {
+    // eslint-disable-next-line no-new
+    new PublicKey(parsed.data.toAddress);
+  } catch {
+    return NextResponse.json(
+      { error: "Enter a valid Solana address" },
+      { status: 400 },
+    );
   }
 
   try {

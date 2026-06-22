@@ -96,6 +96,16 @@ export function validateAction(
       if (state.currentBet === 0n) {
         return { ok: false, error: "No bet to raise; bet instead" };
       }
+      // Betting wasn't reopened to this player: they already acted on this
+      // level and only face a short (sub-minimum) all-in increment. They may
+      // call or fold, but not re-raise. (A full raise resets hasActedThisStreet,
+      // re-granting raise rights.)
+      if (seat.hasActedThisStreet) {
+        return {
+          ok: false,
+          error: "Betting wasn't reopened — you can only call or fold",
+        };
+      }
       if (action.amount === undefined) {
         return { ok: false, error: "Raise requires an amount" };
       }

@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTableSocket } from "@/lib/realtime/use-table-socket";
 import type { ServerEvent } from "@/lib/realtime/events";
-import { formatAmount, parseAmount } from "@/lib/ledger/money";
+import { formatAmount, parseAmount, ASSET_SYMBOLS } from "@/lib/ledger/money";
 import type { Asset } from "@/lib/ledger/money";
 import type { ActionType, Card } from "@/lib/poker/types";
 import {
   playSound,
   soundForAction,
   preloadSounds,
+  isMuted as soundIsMuted,
   setMuted as setSoundMuted,
 } from "@/lib/sound/sound";
 import { Seat } from "./seat";
@@ -34,6 +35,8 @@ export interface PokerTableViewProps {
   demo?: boolean;
   /** Guest free-play: generate an ephemeral id and connect as a guest. */
   guestMode?: boolean;
+  /** Private table with a password — prompt for it on buy-in. */
+  requiresPassword?: boolean;
 }
 
 /** A milled velvet poker chip rendered in pure CSS (striped edge + face rings). */
@@ -84,7 +87,7 @@ export function PokerTableView(props: PokerTableViewProps) {
         break;
       case "SHOWDOWN": {
         const me = playerTokenRef.current;
-        if (me && e.results.some((r) => r.playerId === me && Number(r.amountWon) > 0)) {
+        if (me && e.results.some((r) => r.playerId === me && BigInt(r.amountWon) > 0n)) {
           playSound("win");
         }
         break;
@@ -129,30 +132,16 @@ export function PokerTableView(props: PokerTableViewProps) {
 
   // AFK cues: a beep + a tab-title ping the moment it becomes your turn, with a
   // persisted mute toggle. The visual cue is the pulsing action bar below.
+  // One mute for all table audio, persisted by the sound module (single key).
   const [muted, setMuted] = useState(false);
   useEffect(() => {
     preloadSounds();
-    try {
-      setMuted(localStorage.getItem("velvet_mute_turn") === "1");
-    } catch {
-      /* localStorage unavailable */
-    }
+    setMuted(soundIsMuted());
   }, []);
-  // One mute governs everything — keep the sound module in sync with the toggle.
   useEffect(() => {
     setSoundMuted(muted);
   }, [muted]);
-  const toggleMute = useCallback(() => {
-    setMuted((m) => {
-      const next = !m;
-      try {
-        localStorage.setItem("velvet_mute_turn", next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  }, []);
+  const toggleMute = useCallback(() => setMuted((m) => !m), []);
   useTurnAlert(isYourTurn, muted);
 
   function act(action: ActionType, amount?: bigint) {
@@ -164,17 +153,22 @@ export function PokerTableView(props: PokerTableViewProps) {
     });
   }
 
-  function buyIn(amount: string) {
+  function buyIn(amount: string, password?: string) {
     try {
       const lamports = parseAmount(props.asset, amount);
-      send({ t: "BUY_IN", tableId: props.tableId, amount: lamports.toString() });
+      send({
+        t: "BUY_IN",
+        tableId: props.tableId,
+        amount: lamports.toString(),
+        ...(password ? { password } : {}),
+      });
     } catch {
       /* ignore parse errors; the field guides format */
     }
   }
 
-  // Demo tables use free chips; real tables are labeled in their asset.
-  const unit = props.demo ? "chips" : props.asset;
+  // Demo tables use free chips; real tables are labeled by their asset symbol.
+  const unit = props.demo ? "chips" : ASSET_SYMBOLS[props.asset];
 
   // Oval-table layout: every seat is placed on an ellipse, rotated so your own
   // seat sits at the bottom-center and opponents fan out around the rim.
@@ -412,25 +406,43 @@ export function PokerTableView(props: PokerTableViewProps) {
             );
           })}
 
-          {/* Showdown — overlaid at the top so it never blocks the action */}
-          {state.lastShowdown && (
-            <div className="absolute inset-x-4 top-1 z-[8] mx-auto max-w-md rounded-xl border border-velvet/30 bg-charcoal-900/95 p-2.5 backdrop-blur">
-              <p className="mb-1 text-[11px] uppercase tracking-wider text-ash">
-                Showdown
-              </p>
-              <ul className="space-y-0.5 text-sm">
-                {state.lastShowdown.results
-                  .filter((r) => BigInt(r.amountWon) > 0n)
-                  .map((r) => (
-                    <li key={r.seat} className="text-ivory">
-                      Seat {r.seat + 1} wins{" "}
-                      {formatAmount(props.asset, BigInt(r.amountWon))} {unit} —{" "}
-                      {r.handDescription}
-                    </li>
-                  ))}
-              </ul>
-            </div>
-          )}
+          {/* Showdown — overlaid at the top: winners first, then losing hands,
+              by name (not seat number), so the result reads at a glance. */}
+          {state.lastShowdown &&
+            (() => {
+              const nameFor = (seat: number) =>
+                table?.seats.find((s) => s.seat === seat)?.displayName ??
+                `Seat ${seat + 1}`;
+              const results = [...state.lastShowdown.results].sort((a, b) => {
+                const d = BigInt(b.amountWon) - BigInt(a.amountWon);
+                return d > 0n ? 1 : d < 0n ? -1 : 0;
+              });
+              return (
+                <div className="absolute inset-x-4 top-1 z-[8] mx-auto max-w-md rounded-xl border border-velvet/30 bg-charcoal-900/95 p-2.5 backdrop-blur">
+                  <p className="mb-1 text-[11px] uppercase tracking-wider text-ash">
+                    Showdown
+                  </p>
+                  <ul className="space-y-0.5 text-sm">
+                    {results.map((r) => {
+                      const won = BigInt(r.amountWon);
+                      return (
+                        <li
+                          key={r.seat}
+                          className={won > 0n ? "text-ivory" : "text-ash/70"}
+                        >
+                          <span className={won > 0n ? "font-medium text-velvet-soft" : ""}>
+                            {nameFor(r.seat)}
+                          </span>{" "}
+                          {won > 0n
+                            ? `wins ${formatAmount(props.asset, won)} ${unit} · ${r.handDescription}`
+                            : r.handDescription}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })()}
         </div>
       </div>
 
@@ -450,6 +462,7 @@ export function PokerTableView(props: PokerTableViewProps) {
             maxBuyIn={BigInt(props.maxBuyIn)}
             onBuyIn={buyIn}
             demo={props.demo}
+            requiresPassword={props.requiresPassword}
           />
         ) : isYourTurn && table ? (
           <ActionBar
@@ -468,7 +481,10 @@ export function PokerTableView(props: PokerTableViewProps) {
         ) : (
           <p className="rounded-2xl border border-white/10 bg-charcoal-800/60 py-3 text-center text-sm text-ash">
             {table?.toActSeat != null
-              ? `Waiting on seat ${table.toActSeat + 1}…`
+              ? `Waiting on ${
+                  table.seats.find((s) => s.seat === table.toActSeat)?.displayName ??
+                  `seat ${table.toActSeat + 1}`
+                }…`
               : "Waiting for the next hand…"}
           </p>
         )}

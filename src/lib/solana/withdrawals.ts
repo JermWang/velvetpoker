@@ -128,13 +128,23 @@ export async function requestWithdrawal(params: {
 export async function sendApprovedWithdrawal(
   withdrawalId: string,
 ): Promise<{ txSignature: string }> {
+  // Atomically claim the row APPROVED -> SENDING. Only the worker that flips it
+  // proceeds to broadcast; a concurrent processor/admin send sees count 0 and
+  // backs off. A row stuck in SENDING (e.g. a crash mid-send) is intentionally
+  // NOT auto-retried — it's surfaced for manual reconciliation rather than risk
+  // a double-send, since the chain layer has no idempotency guarantee.
+  const claim = await prisma.withdrawal.updateMany({
+    where: { id: withdrawalId, status: "APPROVED" },
+    data: { status: "SENDING" },
+  });
+  if (claim.count !== 1) {
+    return { txSignature: "" }; // not ours to send (already claimed/sent/not approved)
+  }
+
   const withdrawal = await prisma.withdrawal.findUnique({
     where: { id: withdrawalId },
   });
   if (!withdrawal) throw new Error("Withdrawal not found");
-  if (withdrawal.status !== "APPROVED") {
-    throw new Error(`Withdrawal is not APPROVED (is ${withdrawal.status})`);
-  }
 
   const provider = getSolanaProvider();
   let txSignature: string;

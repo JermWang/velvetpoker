@@ -112,6 +112,9 @@ enum WithdrawalStatus {
   REQUESTED
   PENDING_REVIEW
   APPROVED
+  // Atomically claimed by a sender before broadcasting on-chain, so two workers
+  // (or the processor + an admin) can never double-send the same withdrawal.
+  SENDING
   SENT
   REJECTED
   FAILED

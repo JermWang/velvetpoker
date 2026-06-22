@@ -114,6 +114,7 @@ export default async function TablePage({
       wsUrl={env.wsUrl}
       authQuery={userAuthQuery}
       youUserId={user.id}
+      requiresPassword={table.visibility === "PRIVATE" && Boolean(table.passwordHash)}
     />
   );
 }
