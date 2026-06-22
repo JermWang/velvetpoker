@@ -76,6 +76,8 @@ export interface TableCardData {
   visibility: "PUBLIC" | "PRIVATE";
   status: string;
   isDemo?: boolean;
+  /** Visual-only placeholder tier — shown but not joinable ("Coming soon"). */
+  locked?: boolean;
 }
 
 const SUIT = "♠";
@@ -96,6 +98,44 @@ export function TableCard({
   const hi = convert(table.maxBuyIn, table.asset, prices);
   const blinds = priced([sb, bb], table.asset, " / ", prices.solUsd);
   const buyIn = priced([lo, hi], table.asset, "–", prices.solUsd);
+
+  // Locked "coming soon" tier — visual only (balances the lobby grid), not a
+  // joinable table. Shows the stakes, with a clean blur + label on hover.
+  if (table.locked) {
+    return (
+      <div className="group relative cursor-default select-none">
+        <div className="glass relative flex h-full flex-col overflow-hidden p-5">
+          <div className="relative flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="truncate font-display text-xl text-ivory/90">{table.name}</h3>
+              <p className="mt-0.5 text-[11px] uppercase tracking-[0.2em] text-ash/70">
+                No-Limit Hold&apos;em
+              </p>
+            </div>
+            <span className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-0.5 text-xs font-medium text-ash">
+              {ASSET_SYMBOLS[table.asset]}
+            </span>
+          </div>
+          <div className="relative mt-5 grid grid-cols-2 gap-3 text-sm">
+            <Stat label="Blinds" value={blinds.primary} subtext={blinds.subtext} />
+            <Stat label="Buy-in" value={buyIn.primary} subtext={buyIn.subtext} />
+          </div>
+          <div className="relative mt-5 flex items-center justify-between">
+            <span className="text-xs text-ash/70">Higher stakes</span>
+            <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-ash/70">
+              Coming soon
+            </span>
+          </div>
+        </div>
+        {/* Hover: clean blur + "Coming soon" lock overlay. */}
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 rounded-2xl bg-charcoal-900/35 opacity-0 backdrop-blur-md transition-opacity duration-300 group-hover:opacity-100">
+          <span className="text-2xl">🔒</span>
+          <span className="font-display text-lg text-ivory">Coming soon</span>
+          <span className="text-xs text-ash">Higher stakes are on the way</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Link href={`/app/tables/${table.id}`} className="block">

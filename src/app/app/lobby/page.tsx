@@ -34,6 +34,24 @@ export default async function LobbyPage() {
     isDemo: t.isDemo,
   }));
 
+  // Locked higher-stakes tiers — visual placeholders only (not joinable). They
+  // round the lobby grid to a clean 3×2 and tease the stake ladder. USDC base
+  // units (6dp); easy to adjust or promote to real rooms later.
+  const comingSoon: TableCardData[] = [
+    {
+      id: "soon-250", name: "Velvet — $250", asset: "USDC",
+      smallBlind: 1_250_000n, bigBlind: 2_500_000n,
+      minBuyIn: 125_000_000n, maxBuyIn: 250_000_000n,
+      maxSeats: 6, seatsOccupied: 0, visibility: "PUBLIC", status: "WAITING", locked: true,
+    },
+    {
+      id: "soon-500", name: "Velvet — $500", asset: "USDC",
+      smallBlind: 2_500_000n, bigBlind: 5_000_000n,
+      minBuyIn: 250_000_000n, maxBuyIn: 500_000_000n,
+      maxSeats: 6, seatsOccupied: 0, visibility: "PUBLIC", status: "WAITING", locked: true,
+    },
+  ];
+
   return (
     <div className="space-y-10 py-2">
       {/* Private-room banner — the house specialty. */}
@@ -81,7 +99,7 @@ export default async function LobbyPage() {
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {data.map((t) => (
+            {[...data, ...comingSoon].map((t) => (
               <TableCard key={t.id} table={t} prices={prices} />
             ))}
           </div>
