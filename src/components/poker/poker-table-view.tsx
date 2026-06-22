@@ -14,6 +14,7 @@ import {
   setMuted as setSoundMuted,
 } from "@/lib/sound/sound";
 import { Seat } from "./seat";
+import { useTableMedia } from "@/lib/media/use-table-media";
 import { PlayingCard } from "./playing-card";
 import { ActionBar } from "./action-bar";
 import { BuyInPanel } from "./buy-in-panel";
@@ -38,6 +39,8 @@ export interface PokerTableViewProps {
   guestMode?: boolean;
   /** Private table with a password — prompt for it on buy-in. */
   requiresPassword?: boolean;
+  /** LiveKit configured — enables the table voice/video controls. */
+  voiceEnabled?: boolean;
 }
 
 /** A milled velvet poker chip rendered in pure CSS (striped edge + face rings). */
@@ -158,6 +161,15 @@ export function PokerTableView(props: PokerTableViewProps) {
   }, [muted]);
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
   useTurnAlert(isYourTurn, muted);
+
+  // Table voice/video (LiveKit). Opt-in — connects only when the player taps
+  // "Join voice". Gated to signed-in players at a voice-enabled table.
+  const voiceAvailable = !!props.voiceEnabled && props.youUserId != null;
+  const media = useTableMedia({
+    tableId: props.tableId,
+    seatToken: youToken,
+    enabled: voiceAvailable,
+  });
 
   function act(action: ActionType, amount?: bigint) {
     send({
@@ -284,6 +296,61 @@ export function PokerTableView(props: PokerTableViewProps) {
           >
             {muted ? "🔇" : "🔊"}
           </button>
+
+          {/* Table voice/video (opt-in) */}
+          {voiceAvailable && media.status !== "on" && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="whitespace-nowrap px-2 text-xs"
+              onClick={() => media.join()}
+              disabled={media.status === "connecting"}
+              title="Join table voice & video"
+            >
+              {media.status === "connecting" ? "Joining…" : "🎙 Join voice"}
+            </Button>
+          )}
+          {voiceAvailable && media.status === "on" && (
+            <>
+              <button
+                type="button"
+                onClick={() => media.toggleMic()}
+                aria-label={media.micOn ? "Mute microphone" : "Unmute microphone"}
+                title={media.micOn ? "Mic on" : "Mic off"}
+                className={cn(
+                  "grid h-7 w-7 place-items-center rounded-full border text-sm transition-colors",
+                  media.micOn
+                    ? "border-velvet/50 bg-velvet/20 text-ivory"
+                    : "border-white/10 bg-white/5 text-ash hover:text-ivory",
+                )}
+              >
+                {media.micOn ? "🎙" : "🔇"}
+              </button>
+              <button
+                type="button"
+                onClick={() => media.toggleCam()}
+                aria-label={media.camOn ? "Turn camera off" : "Turn camera on"}
+                title={media.camOn ? "Camera on" : "Camera off"}
+                className={cn(
+                  "grid h-7 w-7 place-items-center rounded-full border text-sm transition-colors",
+                  media.camOn
+                    ? "border-velvet/50 bg-velvet/20 text-ivory"
+                    : "border-white/10 bg-white/5 text-ash hover:text-ivory",
+                )}
+              >
+                {media.camOn ? "📹" : "📷"}
+              </button>
+              <button
+                type="button"
+                onClick={() => media.leave()}
+                aria-label="Leave table voice"
+                title="Leave voice"
+                className="grid h-7 w-7 place-items-center rounded-full border border-red-400/30 bg-red-400/10 text-sm text-red-200 transition-colors hover:bg-red-400/20"
+              >
+                ✕
+              </button>
+            </>
+          )}
           {/* Provable-fairness drawer — only for real (persisted) hands; demo
               hands aren't recorded, so there'd be nothing to verify. */}
           {!props.demo && <VerifyHandDrawer handId={table?.handId ?? null} />}
@@ -494,6 +561,9 @@ export function PokerTableView(props: PokerTableViewProps) {
                   show3d={showdownBySeat.size > 0}
                   isWinner={winAmt != null}
                   compact={isMobile}
+                  videoTrack={
+                    s.playerId ? (media.videoBySeat.get(s.playerId) ?? null) : null
+                  }
                 />
               </div>
             );

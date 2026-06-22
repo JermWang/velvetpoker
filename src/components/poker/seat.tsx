@@ -4,6 +4,7 @@ import type { Asset } from "@/lib/ledger/money";
 import type { WireSeat } from "@/lib/realtime/events";
 import { PlayingCard } from "./playing-card";
 import { Card3D } from "./card-3d";
+import { VideoTile } from "./video-tile";
 import type { Card } from "@/lib/poker/types";
 
 /** Short verb (+ amount where it reads clearly) for a seat's last move. */
@@ -48,6 +49,7 @@ export function Seat({
   show3d,
   isWinner,
   compact,
+  videoTrack,
 }: {
   seat: WireSeat;
   asset: Asset;
@@ -67,6 +69,8 @@ export function Seat({
   isWinner?: boolean;
   /** Tighter sizing for small/portrait screens. */
   compact?: boolean;
+  /** Live camera track for this seat — turns the round avatar into a square video. */
+  videoTrack?: MediaStreamTrack | null;
 }) {
   if (!seat.playerId) {
     return (
@@ -156,7 +160,9 @@ export function Seat({
         )}
         <div
           className={cn(
-            "grid h-12 w-12 place-items-center rounded-full border-2 text-[13px] font-semibold tracking-wide transition-shadow",
+            "grid h-12 w-12 place-items-center overflow-hidden border-2 text-[13px] font-semibold tracking-wide transition-shadow",
+            // Video turns the round avatar into an easier-to-read square tile.
+            videoTrack ? "rounded-lg" : "rounded-full",
             isWinner && "animate-win-glow",
             isYou
               ? "border-velvet bg-velvet/20 text-ivory"
@@ -172,7 +178,17 @@ export function Seat({
               : undefined
           }
         >
-          {isYou ? "YOU" : initials(seat.displayName)}
+          {videoTrack ? (
+            <VideoTile
+              track={videoTrack}
+              mirror={isYou}
+              className="h-full w-full"
+            />
+          ) : isYou ? (
+            "YOU"
+          ) : (
+            initials(seat.displayName)
+          )}
         </div>
         {isDealer && (
           <span className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-ivory text-[10px] font-bold text-charcoal-900 ring-2 ring-charcoal-900">

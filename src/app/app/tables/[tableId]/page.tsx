@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/require-user";
 import { prisma } from "@/lib/db/prisma";
-import { env } from "@/lib/env";
+import { env, isLiveKitConfigured } from "@/lib/env";
 import { canPlayRealMoney } from "@/lib/compliance/gates";
 import { PokerTableView } from "@/components/poker/poker-table-view";
 import { ComplianceGateCard } from "@/components/app-shell/compliance-gate-card";
@@ -22,6 +22,8 @@ export default async function TablePage({
     where: { id: params.tableId },
   });
   if (!table || table.status === "CLOSED") notFound();
+
+  const voiceEnabled = isLiveKitConfigured();
 
   // WS auth for an authenticated user: the site (Vercel) and the ws server
   // (Railway) are on different hosts, so the auth cookie isn't sent on the
@@ -51,7 +53,12 @@ export default async function TablePage({
       demo: true as const,
     };
     return user ? (
-      <PokerTableView {...common} authQuery={userAuthQuery} youUserId={user.id} />
+      <PokerTableView
+        {...common}
+        authQuery={userAuthQuery}
+        youUserId={user.id}
+        voiceEnabled={voiceEnabled}
+      />
     ) : (
       <PokerTableView {...common} authQuery="" youUserId={null} guestMode />
     );
@@ -115,6 +122,7 @@ export default async function TablePage({
       authQuery={userAuthQuery}
       youUserId={user.id}
       requiresPassword={table.visibility === "PRIVATE" && Boolean(table.passwordHash)}
+      voiceEnabled={voiceEnabled}
     />
   );
 }

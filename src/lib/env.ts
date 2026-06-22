@@ -22,6 +22,11 @@ export const env = {
   // Public
   privyAppId: optional("NEXT_PUBLIC_PRIVY_APP_ID") ?? "",
   wsUrl: optional("NEXT_PUBLIC_WS_URL") ?? "ws://localhost:3001",
+  // LiveKit (table voice/video). URL is public (wss://…); key+secret are
+  // server-only (used to mint join tokens). Empty = voice/video disabled.
+  livekitUrl: optional("NEXT_PUBLIC_LIVEKIT_URL") ?? "",
+  livekitApiKey: optional("LIVEKIT_API_KEY") ?? "",
+  livekitApiSecret: optional("LIVEKIT_API_SECRET") ?? "",
   solanaNetwork: (optional("SOLANA_NETWORK") ?? "devnet") as
     | "mainnet-beta"
     | "devnet"
@@ -110,4 +115,13 @@ export function isAdminWallet(address: string | null | undefined): boolean {
 /** True once the custom SPL token mint is configured (token play enabled). */
 export function isTokenConfigured(): boolean {
   return env.tokenMint.length > 0;
+}
+
+/** True once LiveKit is configured (table voice/video enabled). */
+export function isLiveKitConfigured(): boolean {
+  return (
+    env.livekitUrl.length > 0 &&
+    env.livekitApiKey.length > 0 &&
+    env.livekitApiSecret.length > 0
+  );
 }
