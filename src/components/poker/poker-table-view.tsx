@@ -284,7 +284,9 @@ export function PokerTableView(props: PokerTableViewProps) {
           >
             {muted ? "🔇" : "🔊"}
           </button>
-          <VerifyHandDrawer handId={table?.handId ?? null} />
+          {/* Provable-fairness drawer — only for real (persisted) hands; demo
+              hands aren't recorded, so there'd be nothing to verify. */}
+          {!props.demo && <VerifyHandDrawer handId={table?.handId ?? null} />}
           {seated && (
             <Button
               size="sm"
@@ -688,7 +690,9 @@ function seatPosition(
   // horizontal radius and grow the vertical one so seats ring the upright felt
   // instead of being crammed onto a squished wide table.
   if (mobile) {
-    return { x: 50 + 36 * Math.cos(angle), y: 47 + 40 * Math.sin(angle) };
+    // Slightly tighter vertical radius + a touch lower centre so the top seats'
+    // cards clear the felt edge.
+    return { x: 50 + 36 * Math.cos(angle), y: 48 + 36 * Math.sin(angle) };
   }
   // Centred slightly high (48%) so the taller hero cluster at the bottom clears
   // the felt edge. rx leaves room for the ~100px-wide seat clusters at the

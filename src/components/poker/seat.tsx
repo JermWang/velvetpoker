@@ -91,12 +91,15 @@ export function Seat({
         seat.hasFolded && "opacity-40",
       )}
     >
-      {/* Cards — tucked above the avatar, toward the board */}
+      {/* Cards — tucked toward the board. On mobile they sit BEHIND the avatar
+          with a deep overlap so the cluster is short (no clipping at the felt
+          edge); only the readable top of each card peeks out. */}
       {showCards && (
         <div
           className={cn(
-            "relative z-10 mb-[-8px] flex",
+            "flex",
             isYou ? "gap-1.5" : "gap-px",
+            compact ? "z-0 mb-[-22px]" : "relative z-10 mb-[-8px]",
           )}
           style={{ filter: "drop-shadow(0 8px 14px rgba(0,0,0,0.45))" }}
         >
@@ -122,7 +125,7 @@ export function Seat({
       )}
 
       {/* Avatar with timer ring + dealer button */}
-      <div className="relative">
+      <div className={cn("relative", compact && "z-10")}>
         {isToAct && clock && (
           <svg
             viewBox="0 0 56 56"

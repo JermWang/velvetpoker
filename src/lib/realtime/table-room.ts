@@ -325,28 +325,15 @@ export class TableRoom {
     if (!this.config.isDemo) return;
     if (this.hand && !this.hand.isComplete) return;
 
+    // No AI: the free table is real players only. Remove any bots and never
+    // fill seats — a hand starts once two humans are seated.
     let changed = false;
-
-    // Remove all bots when no human is present; otherwise prune busted/sitting-
-    // out bots so the table stays fresh.
-    const noHumans = this.humanCount() === 0;
     for (const [n, s] of this.seats) {
       if (!this.isBotSeat(s)) continue;
-      if (noHumans || s.stack === 0n || s.sittingOut) {
-        this.seats.delete(n);
-        this.seatTokens.delete(s.playerId);
-        changed = true;
-      }
+      this.seats.delete(n);
+      this.seatTokens.delete(s.playerId);
+      changed = true;
     }
-
-    if (!noHumans) {
-      const target = Math.min(TableRoom.DEMO_TARGET_PLAYERS, this.config.maxSeats);
-      while (this.seats.size < target && this.seats.size < this.config.maxSeats) {
-        if (!this.addBot()) break;
-        changed = true;
-      }
-    }
-
     if (changed) this.broadcastSeats();
   }
 
