@@ -44,12 +44,17 @@ function priced(
   solUsd: number | null,
 ): { primary: string; subtext: string | null } {
   const sym = ASSET_SYMBOLS[asset];
-  // Everything priced → whole-dollar USD headline; SOL derived FROM the shown USD.
+  // Everything priced → whole-dollar USD headline.
   if (parts.every((p) => p.usd != null)) {
     const primary = parts.map((p) => fmtUsd(p.usd as number)).join(sep);
-    const subtext = solUsd
-      ? `≈ ${parts.map((p) => fmtSol(shownUsd(p.usd as number) / solUsd)).join(sep)} SOL`
-      : null;
+    // Token tables are BET in the token, so the translation shows the token
+    // amount you'll actually wager. SOL/USDC tables show the SOL equivalent.
+    const subtext =
+      asset === "TOKEN"
+        ? `≈ ${parts.map((p) => p.native).join(sep)} ${sym}`
+        : solUsd
+          ? `≈ ${parts.map((p) => fmtSol(shownUsd(p.usd as number) / solUsd)).join(sep)} SOL`
+          : null;
     return { primary, subtext };
   }
   // Token not yet priced → dash, with the token amount as the small reference.
