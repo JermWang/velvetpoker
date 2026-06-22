@@ -25,19 +25,21 @@ export interface AssetPrices {
 export async function getAssetPrices(): Promise<AssetPrices> {
   const mints = [SOL_MINT, env.usdcMint, env.tokenMint].filter(Boolean);
   try {
+    // Jupiter Price API v3: GET /price/v3?ids=<mints>. Response is keyed by mint
+    // with a numeric `usdPrice` (no `data` wrapper).
     const res = await fetch(
-      `https://lite-api.jup.ag/price/v2?ids=${mints.join(",")}`,
+      `https://lite-api.jup.ag/price/v3?ids=${mints.join(",")}`,
       // Cache across requests so we don't hit the feed on every lobby render.
       { next: { revalidate: 60 } },
     );
     if (!res.ok) throw new Error(`price feed ${res.status}`);
-    const json = (await res.json()) as {
-      data?: Record<string, { price?: string } | null>;
-    };
+    const json = (await res.json()) as Record<
+      string,
+      { usdPrice?: number } | null
+    >;
     const priceOf = (mint: string): number | null => {
-      const raw = json.data?.[mint]?.price;
-      const n = raw != null ? Number(raw) : NaN;
-      return Number.isFinite(n) && n > 0 ? n : null;
+      const n = json[mint]?.usdPrice;
+      return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : null;
     };
     return {
       solUsd: priceOf(SOL_MINT),
