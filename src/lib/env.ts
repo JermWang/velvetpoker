@@ -80,6 +80,9 @@ export const env = {
   // generic JSON). Unset = alerts are recorded to the DB only.
   alertWebhookUrl: optional("ALERT_WEBHOOK_URL"),
   depositConfirmations: Number(optional("DEPOSIT_CONFIRMATIONS") ?? "32"),
+  // Cap on concurrent private tables (server-overload guard). Hosting is blocked
+  // with a "wait" message once this many private games are live.
+  maxPrivateTables: Number(optional("MAX_PRIVATE_TABLES") ?? "50"),
   wsPort: Number(optional("WS_PORT") ?? "3001"),
   isProduction: process.env.NODE_ENV === "production",
 

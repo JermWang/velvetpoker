@@ -1,9 +1,9 @@
 /**
- * The house cash games — three dollar-pegged stake tiers + a free-play demo.
+ * The house cash games — two dollar-pegged stake tiers + a free-play demo.
  * Idempotent: keyed on a stable inviteCode so re-running updates, never dupes.
  * Cash rooms take the 3% house rake (team / buyback / referrals).
  *
- * Tiers are defined in USD ($20 / $50 / $100 buy-ins). When the custom token is
+ * Tiers are defined in USD ($20 entry + the $100 "Velvet Room"). When the token is
  * live and has a market price, the rooms are denominated in the TOKEN, with
  * amounts pegged to those dollar values at the launch price (so the lobby shows
  * "$20" with the equivalent token amount as the translation). Until the token
@@ -37,9 +37,9 @@ interface Tier {
   minUsd: number;
   maxUsd: number;
 }
+// Two cash options: a $20 entry tier and the flagship "The Velvet Room" ($100).
 const TIERS: Tier[] = [
   { code: "HOUSE-MICRO", usd: 20, sbUsd: 0.1, bbUsd: 0.2, minUsd: 10, maxUsd: 20 },
-  { code: "HOUSE-LOW", usd: 50, sbUsd: 0.25, bbUsd: 0.5, minUsd: 25, maxUsd: 50 },
   { code: "HOUSE-MID", usd: 100, sbUsd: 0.5, bbUsd: 1, minUsd: 50, maxUsd: 100 },
 ];
 const HIGHEST_USD = Math.max(...TIERS.map((t) => t.usd));

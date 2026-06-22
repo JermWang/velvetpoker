@@ -64,6 +64,22 @@ export async function POST(req: Request) {
     );
   }
 
+  // Server-overload guard: cap concurrent private games. When full, host has to
+  // wait for one to free up.
+  if (c.visibility === "PRIVATE") {
+    const active = await prisma.pokerTable.count({
+      where: { visibility: "PRIVATE", status: { in: ["WAITING", "ACTIVE"] } },
+    });
+    if (active >= env.maxPrivateTables) {
+      return NextResponse.json(
+        {
+          error: `All private tables are full (${active}/${env.maxPrivateTables}). Please wait for one to open up.`,
+        },
+        { status: 503 },
+      );
+    }
+  }
+
   try {
     const asset = c.asset;
     const smallBlind = parseAmount(asset, c.smallBlind);
@@ -95,6 +111,8 @@ export async function POST(req: Request) {
         maxBuyIn,
         maxSeats: c.maxSeats,
         visibility: c.visibility,
+        // Private tables rake 2% (split 1% house treasury / 1% token buyback).
+        rakeBps: c.visibility === "PRIVATE" ? 200 : 0,
         passwordHash: c.password ? hashPassword(c.password) : null,
         inviteCode: generateInviteCode(),
         actionTimeoutSeconds: c.actionTimeoutSeconds,

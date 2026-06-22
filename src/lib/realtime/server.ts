@@ -134,7 +134,11 @@ async function createRoom(tableId: string): Promise<RoomEntry | null> {
   // Real-money tables persist hands + route settlement through the ledger.
   // Demo tables run purely in memory: no ledger, no DB writes, free chips.
   if (!table.isDemo) {
-    attachHandPersistence(room, { id: table.id, asset: table.asset });
+    attachHandPersistence(room, {
+      id: table.id,
+      asset: table.asset,
+      isPrivate: table.visibility === "PRIVATE",
+    });
   }
 
   const entry: RoomEntry = { room, clients, isDemo: table.isDemo };

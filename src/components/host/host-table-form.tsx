@@ -12,12 +12,18 @@ export function HostTableForm({
   authed,
   tokenConfigured,
   tokenSymbol,
+  privateActive,
+  privateMax,
 }: {
   authed: boolean;
   tokenConfigured: boolean;
   tokenSymbol: string;
+  privateActive: number;
+  privateMax: number;
 }) {
   const router = useRouter();
+  const privateFull = privateActive >= privateMax;
+  const privateLeft = Math.max(0, privateMax - privateActive);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Public tables must use the token; private tables may use SOL/USDC/token.
@@ -47,6 +53,12 @@ export function HostTableForm({
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (visibility === "PRIVATE" && privateFull) {
+      setError(
+        `All private tables are full (${privateActive}/${privateMax}). Please wait for one to open up.`,
+      );
+      return;
+    }
     setSubmitting(true);
     setError(null);
     const form = new FormData(e.currentTarget);
@@ -173,6 +185,38 @@ export function HostTableForm({
           </div>
 
           {visibility === "PRIVATE" && (
+            <div
+              className={`rounded-xl border p-4 ${
+                privateFull
+                  ? "border-amber-400/30 bg-amber-400/[0.06]"
+                  : "border-white/8 bg-white/[0.02]"
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs">
+                <span className="uppercase tracking-[0.18em] text-ash/70">
+                  Private tables in play
+                </span>
+                <span className="font-mono text-ivory">
+                  {privateActive}/{privateMax}
+                </span>
+              </div>
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/8">
+                <div
+                  className={`h-full rounded-full ${privateFull ? "bg-amber-400" : "bg-velvet"}`}
+                  style={{
+                    width: `${Math.min(100, Math.round((privateActive / Math.max(1, privateMax)) * 100))}%`,
+                  }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-ash">
+                {privateFull
+                  ? "All private tables are full right now. Please wait for one to open up before creating a new game."
+                  : `${privateLeft} slot${privateLeft === 1 ? "" : "s"} open. We cap concurrent private games to keep tables fast and stable.`}
+              </p>
+            </div>
+          )}
+
+          {visibility === "PRIVATE" && (
             <div>
               <Label htmlFor="password">Optional password</Label>
               <Input
@@ -198,8 +242,15 @@ export function HostTableForm({
           {error && <p className="text-sm text-red-300">{error}</p>}
 
           {authed ? (
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Creating…" : "Create table"}
+            <Button
+              type="submit"
+              disabled={submitting || (visibility === "PRIVATE" && privateFull)}
+            >
+              {submitting
+                ? "Creating…"
+                : visibility === "PRIVATE" && privateFull
+                  ? "Private tables full — please wait"
+                  : "Create table"}
             </Button>
           ) : (
             <div className="space-y-2">

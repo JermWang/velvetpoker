@@ -7,7 +7,7 @@
 
 import { prisma } from "@/lib/db/prisma";
 import { settleHandLedger, type RakeSplit } from "@/lib/ledger/ledger";
-import { splitRakeThreeWays } from "@/lib/poker/rake";
+import { splitRakeThreeWays, splitRakePrivate } from "@/lib/poker/rake";
 import type { Asset } from "@prisma/client";
 import type {
   HandCompletedInfo,
@@ -19,6 +19,8 @@ import type {
 interface PersistTable {
   id: string;
   asset: Asset;
+  /** Private tables rake 2% split 1% house / 1% buyback (no referral pool). */
+  isPrivate?: boolean;
 }
 
 export async function persistHandSettled(
@@ -29,11 +31,15 @@ export async function persistHandSettled(
   // ledger entries link to the persisted Hand row (admin/history join on it).
   const dbHandId = await resolveDbHandId(table.id, s.handId);
 
-  // Split the rake three ways. The referral third is attributed to the referrers
-  // of contributing players, proportional to pot contribution; any slice for a
-  // player with no referrer stays with the house.
+  // Private tables: 2% rake split 1% house treasury / 1% buyback, no referral.
   let rakeSplit: RakeSplit | undefined;
-  if (s.rake > 0n) {
+  if (s.rake > 0n && table.isPrivate) {
+    const { team, buyback } = splitRakePrivate(s.rake);
+    rakeSplit = { team, buyback, referralPayouts: [] };
+  } else if (s.rake > 0n) {
+    // Public/house tables: split the rake three ways. The referral third is
+    // attributed to the referrers of contributing players, proportional to pot
+    // contribution; any slice for a player with no referrer stays with the house.
     const { team, buyback, referral } = splitRakeThreeWays(s.rake);
     const totalContribution = s.contributions.reduce((a, c) => a + c.amount, 0n);
 

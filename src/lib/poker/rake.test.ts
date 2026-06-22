@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { computeRake, splitRakeThreeWays, RAKE_CAP_BIG_BLINDS } from "./rake";
+import {
+  computeRake,
+  splitRakeThreeWays,
+  splitRakePrivate,
+  RAKE_CAP_BIG_BLINDS,
+} from "./rake";
 
 const bb = 2_000_000n; // 0.002 SOL big blind
 
@@ -39,6 +44,23 @@ describe("splitRakeThreeWays", () => {
       // referral/buyback never exceed an even third; team holds the remainder
       expect(s.buyback).toBe(rake / 3n);
       expect(s.referral).toBe(rake / 3n);
+      expect(s.team).toBeGreaterThanOrEqual(s.buyback);
+    }
+  });
+});
+
+describe("splitRakePrivate", () => {
+  it("splits the 2% private rake evenly: half house, half buyback", () => {
+    const s = splitRakePrivate(2_000_000n);
+    expect(s).toEqual({ team: 1_000_000n, buyback: 1_000_000n });
+    expect(s.team + s.buyback).toBe(2_000_000n);
+  });
+
+  it("gives the odd remainder to the house and conserves the total", () => {
+    for (const rake of [1n, 3n, 5n, 7n, 101n, 99_999_999n]) {
+      const s = splitRakePrivate(rake);
+      expect(s.team + s.buyback).toBe(rake);
+      expect(s.buyback).toBe(rake / 2n);
       expect(s.team).toBeGreaterThanOrEqual(s.buyback);
     }
   });

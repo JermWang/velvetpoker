@@ -13,6 +13,9 @@
 /** Default rake in basis points (3%). Per-table override via PokerTable.rakeBps. */
 export const DEFAULT_RAKE_BPS = 300;
 
+/** Private-table rake (2%): split 1% house treasury / 1% token buyback. */
+export const PRIVATE_RAKE_BPS = 200;
+
 /** Cap the rake at this many big blinds, regardless of pot size. */
 export const RAKE_CAP_BIG_BLINDS = 3n;
 
@@ -43,4 +46,18 @@ export function splitRakeThreeWays(rake: bigint): {
   const referral = rake / 3n;
   const team = rake - buyback - referral; // remainder stays with the house
   return { team, buyback, referral };
+}
+
+/**
+ * Private-table rake split: half to the house treasury (team), half to the
+ * token buyback reserve. No referral cut. The house absorbs the rounding
+ * remainder (odd base unit).
+ */
+export function splitRakePrivate(rake: bigint): {
+  team: bigint;
+  buyback: bigint;
+} {
+  const buyback = rake / 2n;
+  const team = rake - buyback; // remainder stays with the house
+  return { team, buyback };
 }

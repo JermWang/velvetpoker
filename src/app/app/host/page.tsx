@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth/require-user";
 import { HostTableForm } from "@/components/host/host-table-form";
+import { prisma } from "@/lib/db/prisma";
 import { env, isTokenConfigured } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,11 @@ export const dynamic = "force-dynamic";
 // required to actually create it (gated on the form's submit).
 export default async function HostPage() {
   const user = await getCurrentUser();
+  // Private-table capacity (server-overload guard). Surfaced so hosts see how
+  // many slots are left before they fill out the form.
+  const privateActive = await prisma.pokerTable.count({
+    where: { visibility: "PRIVATE", status: { in: ["WAITING", "ACTIVE"] } },
+  });
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <div>
@@ -22,6 +28,8 @@ export default async function HostPage() {
         authed={Boolean(user)}
         tokenConfigured={isTokenConfigured()}
         tokenSymbol={env.tokenSymbol}
+        privateActive={privateActive}
+        privateMax={env.maxPrivateTables}
       />
     </div>
   );
