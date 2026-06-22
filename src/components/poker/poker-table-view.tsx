@@ -389,7 +389,11 @@ export function PokerTableView(props: PokerTableViewProps) {
               </p>
             )}
             {table && (
-              <div className="flex items-center gap-2 rounded-full border border-velvet/30 bg-charcoal-900/55 px-3.5 py-1.5 backdrop-blur">
+              // key on the pot value so the pill re-mounts and "pops" when it grows.
+              <div
+                key={table.totalPot}
+                className="animate-pot-pop flex items-center gap-2 rounded-full border border-velvet/30 bg-charcoal-900/55 px-3.5 py-1.5 backdrop-blur"
+              >
                 <Chip size={22} />
                 <span className="text-[11px] text-ash">Pot</span>
                 <span className="font-mono text-sm text-velvet-soft">
@@ -416,7 +420,7 @@ export function PokerTableView(props: PokerTableViewProps) {
                 className="absolute z-[4] -translate-x-1/2 -translate-y-1/2"
                 style={{ left: `${bx}%`, top: `${by}%` }}
               >
-                <div className="flex items-center gap-1.5">
+                <div className="animate-chip-in flex items-center gap-1.5">
                   <Chip size={18} />
                   <span className="rounded-full border border-white/8 bg-charcoal-900/80 px-2 py-px font-mono text-[10px] text-ivory">
                     {formatAmount(props.asset, bet)}
@@ -432,6 +436,10 @@ export function PokerTableView(props: PokerTableViewProps) {
               (s.seat - heroSlotAnchor + seatCount) % seatCount,
               seatCount,
             );
+            const winResult = state.lastShowdown?.results.find(
+              (r) => r.seat === s.seat && BigInt(r.amountWon) > 0n,
+            );
+            const winAmt = winResult ? BigInt(winResult.amountWon) : null;
             return (
               <div
                 key={s.seat}
@@ -442,6 +450,15 @@ export function PokerTableView(props: PokerTableViewProps) {
                   transform: "translate(-50%, -50%)",
                 }}
               >
+                {/* Win flourish — amount rises and fades over the winner. */}
+                {winAmt != null && (
+                  <div
+                    key={`win-${table.handId}-${s.seat}`}
+                    className="animate-win-rise pointer-events-none absolute left-1/2 -top-3 z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-300/90 px-2 py-0.5 text-[11px] font-bold text-charcoal-900 shadow-elevated"
+                  >
+                    +{formatAmount(props.asset, winAmt)} {unit}
+                  </div>
+                )}
                 <Seat
                   seat={s}
                   asset={props.asset}
@@ -453,6 +470,7 @@ export function PokerTableView(props: PokerTableViewProps) {
                   revealCards={showdownBySeat.get(s.seat)?.cards ?? null}
                   handLabel={showdownBySeat.get(s.seat)?.handDescription ?? null}
                   show3d={showdownBySeat.size > 0}
+                  isWinner={winAmt != null}
                 />
               </div>
             );

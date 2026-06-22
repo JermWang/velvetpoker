@@ -46,6 +46,7 @@ export function Seat({
   revealCards,
   handLabel,
   show3d,
+  isWinner,
 }: {
   seat: WireSeat;
   asset: Asset;
@@ -61,6 +62,8 @@ export function Seat({
   handLabel?: string | null;
   /** At a contested showdown, flip YOUR hand to the premium 3D card. */
   show3d?: boolean;
+  /** This seat won the pot — pulse the avatar gold. */
+  isWinner?: boolean;
 }) {
   if (!seat.playerId) {
     return (
@@ -144,6 +147,7 @@ export function Seat({
         <div
           className={cn(
             "grid h-12 w-12 place-items-center rounded-full border-2 text-[13px] font-semibold tracking-wide transition-shadow",
+            isWinner && "animate-win-glow",
             isYou
               ? "border-velvet bg-velvet/20 text-ivory"
               : "border-white/15 bg-charcoal-700 text-ivory",
