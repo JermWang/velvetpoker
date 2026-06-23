@@ -656,9 +656,13 @@ export function PokerTableView(props: PokerTableViewProps) {
           </div>
         ) : !seated ? (
           props.demo ? (
-            <p className="rounded-2xl border border-velvet/25 bg-velvet/[0.06] py-3 text-center text-sm text-velvet/90">
-              Tap an open seat to sit down with a free stack.
-            </p>
+            <div className="rounded-2xl border border-velvet/40 bg-charcoal-800/90 p-4 text-center shadow-elevated">
+              <p className="text-2xl">🪑</p>
+              <p className="mt-1 text-sm font-semibold text-ivory">Take a seat</p>
+              <p className="mt-1 text-xs leading-snug text-ash">
+                Tap any open seat to sit down with a free stack.
+              </p>
+            </div>
           ) : (
             <BuyInPanel
               asset={props.asset}
@@ -691,35 +695,16 @@ export function PokerTableView(props: PokerTableViewProps) {
             </Button>
           </div>
         ) : (
-          <div className="space-y-2">
-            {/* Pre-action: queue your move before it's your turn. */}
-            {yourSeat?.inHand && !yourSeat.sittingOut && (
-              <div className="flex flex-wrap justify-center gap-1.5">
-                {(
-                  [
-                    ["checkfold", "Check/Fold"],
-                    ["check", "Check"],
-                    ["callany", "Call any"],
-                    ["fold", "Fold"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setPreAction((p) => (p === key ? null : key))}
-                    className={cn(
-                      "rounded-lg border px-2.5 py-1 text-xs transition-colors",
-                      preAction === key
-                        ? "border-velvet bg-velvet/25 text-ivory"
-                        : "border-white/12 text-ash hover:text-ivory",
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-            <p className="rounded-2xl border border-white/10 bg-charcoal-800/60 py-3 text-center text-sm text-ash">
+          <div className="rounded-2xl border border-white/10 bg-charcoal-800/70 p-3.5 shadow-elevated">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ash/70">
+                {table?.handId ? "Hand in play" : "Table"}
+              </span>
+              <span className="font-mono text-xs text-velvet-soft">
+                {formatAmount(props.asset, BigInt(table?.totalPot ?? "0"))} {unit}
+              </span>
+            </div>
+            <p className="mt-2 text-center text-sm text-ivory/90">
               {table?.toActSeat != null
                 ? `Waiting on ${
                     table.seats.find((s) => s.seat === table.toActSeat)?.displayName ??
@@ -727,6 +712,38 @@ export function PokerTableView(props: PokerTableViewProps) {
                   }…`
                 : "Waiting for the next hand…"}
             </p>
+            {/* Pre-action: queue your move before it's your turn. */}
+            {yourSeat?.inHand && !yourSeat.sittingOut && (
+              <div className="mt-3 border-t border-white/8 pt-3">
+                <p className="mb-1.5 text-center text-[10px] uppercase tracking-wider text-ash/50">
+                  Plan ahead
+                </p>
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {(
+                    [
+                      ["checkfold", "Check/Fold"],
+                      ["check", "Check"],
+                      ["callany", "Call any"],
+                      ["fold", "Fold"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setPreAction((p) => (p === key ? null : key))}
+                      className={cn(
+                        "rounded-lg border px-2.5 py-1 text-xs transition-colors",
+                        preAction === key
+                          ? "border-velvet bg-velvet/25 text-ivory"
+                          : "border-white/12 text-ash hover:text-ivory",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {state.error && (
