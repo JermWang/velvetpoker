@@ -68,6 +68,9 @@ export function useTableSocket({
     ws.onopen = () => {
       setState((s) => ({ ...s, connected: true }));
       ws.send(JSON.stringify({ t: "JOIN_TABLE", tableId }));
+      // Belt-and-suspenders: explicitly ask for a full baseline so a dropped or
+      // out-of-order seat frame can never strand us without table state.
+      ws.send(JSON.stringify({ t: "REQUEST_TABLE_STATE", tableId }));
     };
     ws.onclose = () => setState((s) => ({ ...s, connected: false }));
     ws.onmessage = (msg) => {

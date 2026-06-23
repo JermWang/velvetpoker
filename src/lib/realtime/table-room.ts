@@ -762,7 +762,6 @@ export class TableRoom {
       })),
     });
 
-    this.broadcastSeats();
     this.broadcastTableState();
 
     // Briefly pause, then deal the next hand if still enough players.
@@ -825,11 +824,13 @@ export class TableRoom {
   }
 
   private broadcastSeats(): void {
-    this.broadcast({
-      t: "SEAT_UPDATE",
-      tableId: this.config.tableId,
-      seats: this.buildTableState().seats,
-    });
+    // Send a FULL TABLE_STATE, not a partial SEAT_UPDATE. A client that hasn't
+    // reduced its first TABLE_STATE yet DROPS SEAT_UPDATE on the floor (see
+    // use-table-socket reduce()), which could leave a just-seated player
+    // invisible to everyone until a hand started — and a hand can't start with
+    // < 2 visible players, so two players could be stuck never seeing each
+    // other. TABLE_STATE is self-healing: the client accepts it from any state.
+    this.broadcastTableState();
   }
 
   // ---- helpers -----------------------------------------------------------
