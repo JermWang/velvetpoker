@@ -126,6 +126,9 @@ export class TableRoom {
   private seatTokens = new Map<string, string>();
   private botCounter = 0;
   private botTimer: ReturnType<typeof setTimeout> | null = null;
+  // Demo only: after a lone human waits this long with no opponents, fill the
+  // table with bots so they always get a game (and so testing works solo).
+  private botFillTimer: ReturnType<typeof setTimeout> | null = null;
   private hand: HandState | null = null;
   private handNumber = 0;
   private dealerSeat = 0;
@@ -307,6 +310,8 @@ export class TableRoom {
   /** Target seated players to keep a free-play table lively for a lone human. */
   // Keep demo tables feeling alive — fill close to full (capped by maxSeats).
   private static readonly DEMO_TARGET_PLAYERS = 5;
+  /** Wait this long for real opponents before filling a demo table with bots. */
+  private static readonly BOT_FILL_DELAY_MS = 30_000;
 
   private isBotSeat(s: RoomSeat): boolean {
     return isBotId(s.playerId);
@@ -335,24 +340,73 @@ export class TableRoom {
   }
 
   /**
-   * Keep demo tables populated with bots: remove all bots when no human is
-   * present (so the table idles), otherwise top up to a small target. Only
-   * mutates between hands.
+   * Demo-table bot management. Real players always get priority: a lone human
+   * gets BOT_FILL_DELAY_MS for opponents to show up; if none do, the table is
+   * filled with bots so they can play. Once enough players are seated the fill
+   * timer is cancelled, and when the last human leaves all bots are removed so
+   * the table idles. Only mutates between hands.
    */
   private manageBots(): void {
     if (!this.config.isDemo) return;
     if (this.hand && !this.hand.isComplete) return;
 
-    // No AI: the free table is real players only. Remove any bots and never
-    // fill seats — a hand starts once two humans are seated.
+    // No humans → idle the table: drop every bot and cancel any pending fill.
+    if (this.humanCount() === 0) {
+      this.clearBotFill();
+      if (this.removeBots(() => true)) this.broadcastSeats();
+      return;
+    }
+
+    // Enough players to deal already (a 2nd human, or bots are in) — no fill.
+    if (this.eligiblePlayers().length >= 2) {
+      this.clearBotFill();
+      return;
+    }
+
+    // A human is waiting with no opponents. Give real players 30s to show up,
+    // then fill with bots.
+    if (!this.botFillTimer) {
+      this.botFillTimer = setTimeout(
+        () => this.fillWithBots(),
+        TableRoom.BOT_FILL_DELAY_MS,
+      );
+    }
+  }
+
+  private clearBotFill(): void {
+    if (this.botFillTimer) {
+      clearTimeout(this.botFillTimer);
+      this.botFillTimer = null;
+    }
+  }
+
+  /** Remove bot seats matching `pred`; returns true if any were removed. */
+  private removeBots(pred: (s: RoomSeat) => boolean): boolean {
     let changed = false;
     for (const [n, s] of this.seats) {
-      if (!this.isBotSeat(s)) continue;
-      this.seats.delete(n);
-      this.seatTokens.delete(s.playerId);
-      changed = true;
+      if (this.isBotSeat(s) && pred(s)) {
+        this.seats.delete(n);
+        this.seatTokens.delete(s.playerId);
+        changed = true;
+      }
     }
-    if (changed) this.broadcastSeats();
+    return changed;
+  }
+
+  /** Timer fired: a lone human still has no opponents — seat bots and deal. */
+  private fillWithBots(): void {
+    this.botFillTimer = null;
+    if (!this.config.isDemo) return;
+    if (this.hand && !this.hand.isComplete) return;
+    if (this.humanCount() === 0) return; // they left
+    if (this.eligiblePlayers().length >= 2) return; // someone showed up
+
+    this.removeBots((s) => s.stack <= 0n); // clear any busted bots first
+    while (this.seats.size < TableRoom.DEMO_TARGET_PLAYERS) {
+      if (!this.addBot()) break; // table full
+    }
+    this.broadcastSeats();
+    this.maybeStartHand();
   }
 
   private addBot(): boolean {
