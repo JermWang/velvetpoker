@@ -4,6 +4,12 @@ import { TableCard, type TableCardData } from "@/components/lobby/table-card";
 import { JoinPrivate } from "@/components/lobby/join-private";
 import { Button } from "@/components/ui/button";
 import { getAssetPrices } from "@/lib/pricing/prices";
+import { env } from "@/lib/env";
+
+// Public cash games are wagered in the house token; show it on the card pill.
+// Falls back to the brand ticker until NEXT_PUBLIC_TOKEN_SYMBOL is configured.
+const TOKEN_TAG =
+  env.tokenSymbol && env.tokenSymbol !== "TOKEN" ? env.tokenSymbol : "VELVET";
 
 export const dynamic = "force-dynamic";
 
@@ -100,7 +106,7 @@ export default async function LobbyPage() {
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {[...data, ...comingSoon].map((t) => (
-              <TableCard key={t.id} table={t} prices={prices} />
+              <TableCard key={t.id} table={t} prices={prices} tokenSymbol={TOKEN_TAG} />
             ))}
           </div>
         )}

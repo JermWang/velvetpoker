@@ -90,12 +90,23 @@ const SUIT = "♠";
 export function TableCard({
   table,
   prices,
+  tokenSymbol = "VELVET",
 }: {
   table: TableCardData;
   prices: AssetPrices;
+  /** Display ticker for the house token (public cash games are wagered in it). */
+  tokenSymbol?: string;
 }) {
   const seats = Array.from({ length: table.maxSeats }, (_, i) => i < table.seatsOccupied);
   const live = table.status === "ACTIVE";
+
+  // The little currency pill: free play, the token for public cash games (the
+  // betting currency — prices below stay in USD), or the real asset for private.
+  const currencyTag = table.isDemo
+    ? "FREE"
+    : table.visibility === "PRIVATE"
+      ? ASSET_SYMBOLS[table.asset]
+      : `$${tokenSymbol}`;
 
   const sb = convert(table.smallBlind, table.asset, prices);
   const bb = convert(table.bigBlind, table.asset, prices);
@@ -118,7 +129,7 @@ export function TableCard({
               </p>
             </div>
             <span className="rounded-full border border-white/12 bg-white/[0.04] px-2.5 py-0.5 text-xs font-medium text-ash">
-              {ASSET_SYMBOLS[table.asset]}
+              {currencyTag}
             </span>
           </div>
           <div className="relative mt-5 grid grid-cols-2 gap-3 text-sm">
@@ -157,7 +168,7 @@ export function TableCard({
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5">
             <span className="rounded-full border border-velvet/30 bg-velvet/10 px-2.5 py-0.5 text-xs font-medium text-velvet">
-              {table.isDemo ? "FREE" : ASSET_SYMBOLS[table.asset]}
+              {currencyTag}
             </span>
             <span className="flex items-center gap-1 text-[11px] text-ash">
               <span
