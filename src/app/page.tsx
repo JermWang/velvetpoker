@@ -86,7 +86,7 @@ export default function StartScreen() {
           className="mt-10 flex items-center gap-3 text-[11px] uppercase tracking-[0.22em] text-ash/60 animate-fade-up"
           style={{ animationDelay: "380ms" }}
         >
-          <span>Provably fair</span>
+          <span>Verified RNG</span>
           <span className="text-velvet/40">◆</span>
           <span>Instant settlement</span>
           <span className="text-velvet/40">◆</span>
