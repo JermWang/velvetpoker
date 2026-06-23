@@ -69,21 +69,29 @@ export function useTableSocket({
     let attempts = 0;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
-    const connect = async () => {
+    const connect = async (refreshTicket: boolean) => {
       if (disposed) return;
-      // Authed connections use a ws ticket that expires fast. Fetch a FRESH one
-      // on every (re)connect so a reconnect long after page load still
-      // authenticates. Guest/spectator/dev paths use their query as-is.
+      // The page embeds a fresh ticket at load, so the FIRST connect uses it
+      // directly — never block opening the socket on a network call (a slow
+      // ticket route would otherwise hang us in "Connecting…" forever). Only on
+      // a RECONNECT (embedded ticket may be stale) do we fetch a fresh one, and
+      // even then it's bounded so it can never hang the reconnect.
       let query = authQuery;
-      if (authQuery.startsWith("ticket=")) {
+      if (refreshTicket && authQuery.startsWith("ticket=")) {
         try {
-          const res = await fetch("/api/realtime/ticket", { cache: "no-store" });
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 4000);
+          const res = await fetch("/api/realtime/ticket", {
+            cache: "no-store",
+            signal: ctrl.signal,
+          });
+          clearTimeout(t);
           if (res.ok) {
             const j = (await res.json()) as { ticket?: string };
             if (j.ticket) query = `ticket=${encodeURIComponent(j.ticket)}`;
           }
         } catch {
-          /* fall back to the page-embedded ticket */
+          /* timed out or failed — fall back to the page-embedded ticket */
         }
       }
       if (disposed) return;
@@ -105,7 +113,7 @@ export function useTableSocket({
         attempts += 1;
         // 0.5s, 1s, 2s, 4s, capped at 8s.
         const delay = Math.min(8000, 500 * 2 ** Math.min(attempts - 1, 4));
-        reconnectTimer = setTimeout(connect, delay);
+        reconnectTimer = setTimeout(() => connect(true), delay);
       };
       ws.onmessage = (msg) => {
         let event: ServerEvent;
@@ -119,7 +127,7 @@ export function useTableSocket({
       };
     };
 
-    connect();
+    connect(false); // first connect: use the embedded ticket, no blocking fetch
     return () => {
       disposed = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
