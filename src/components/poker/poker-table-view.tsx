@@ -402,7 +402,7 @@ export function PokerTableView(props: PokerTableViewProps) {
       {/* Felt — a bounded oval table in its own container; top padding gives the
           top-row seats headroom so their cards aren't clipped at the edge. */}
       <div
-        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-3xl pt-8 shadow-elevated sm:pt-10"
+        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-3xl pb-8 pt-10 shadow-elevated sm:pb-10 sm:pt-12"
         style={{
           background:
             "radial-gradient(120% 90% at 50% 8%, rgba(27,77,58,0.18), transparent 55%), #0c0d10",
@@ -410,7 +410,7 @@ export function PokerTableView(props: PokerTableViewProps) {
       >
         {/* Keep the Claude-design aspect (1180×560) so the oval stays proportional;
             grow it as large as the viewport height allows. */}
-        <div className="relative h-full w-full sm:aspect-[1180/560] sm:h-auto sm:max-h-full sm:max-w-5xl">
+        <div className="relative h-full w-full sm:aspect-[1140/600] sm:h-auto sm:max-h-full sm:max-w-5xl">
           {/* Rail + felt surface — insets match the prototype (18px / 96px on
               1180×560 ≈ 3.2% vertical, 8.1% horizontal). */}
           <div className="pointer-events-none absolute" style={{ inset: "3.2% 8.1%" }}>
@@ -801,7 +801,7 @@ function seatPosition(
   // rx leaves room for the ~100px-wide seat clusters at the sides; ry is kept
   // modest and the ring sits a touch low so the TOP-row seats keep their cards
   // clear of the felt edge (with the felt's top padding adding more headroom).
-  return { x: 50 + 45 * Math.cos(angle), y: 50 + 30 * Math.sin(angle) };
+  return { x: 50 + 43 * Math.cos(angle), y: 50 + 30 * Math.sin(angle) };
 }
 
 /**
