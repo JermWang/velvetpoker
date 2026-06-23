@@ -402,7 +402,7 @@ export function PokerTableView(props: PokerTableViewProps) {
       {/* Felt — a bounded oval table in its own container; top padding gives the
           top-row seats headroom so their cards aren't clipped at the edge. */}
       <div
-        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-3xl pb-8 pt-10 shadow-elevated sm:pb-10 sm:pt-12"
+        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-3xl pb-2 pt-3 shadow-elevated sm:pb-10 sm:pt-12"
         style={{
           background:
             "radial-gradient(120% 90% at 50% 8%, rgba(27,77,58,0.18), transparent 55%), #0c0d10",
