@@ -772,27 +772,48 @@ export class TableRoom {
 
   buildTableState(): WireTableState {
     const pub = this.hand ? serializePublicState(this.hand) : null;
-    const seats: WireSeat[] = [...this.seats.values()]
-      .sort((a, b) => a.seatNumber - b.seatNumber)
-      .map((s) => {
-        const es = this.hand?.seats.find((x) => x.playerId === s.playerId);
-        const la = this.lastActionBySeat.get(s.seatNumber);
-        return {
-          seat: s.seatNumber,
-          // Opaque per-table token, never the real user id (privacy).
-          playerId: this.tokenFor(s.playerId),
-          displayName: s.displayName,
-          stack: (es?.stack ?? s.stack).toString(),
-          committedThisStreet: (es?.committedThisStreet ?? 0n).toString(),
-          hasFolded: es?.hasFolded ?? false,
-          isAllIn: es?.isAllIn ?? false,
-          inHand: es?.inHand ?? false,
-          sittingOut: s.sittingOut,
-          lastAction: la
-            ? { action: la.action, amount: la.amount.toString() }
-            : null,
-        };
+    // Emit the FULL seat ring (0 .. maxSeats-1), not just occupied seats, so the
+    // client can render every position and offer the open ones to sit. Empty
+    // seats carry a null playerId.
+    const occupied = new Map(
+      [...this.seats.values()].map((s) => [s.seatNumber, s] as const),
+    );
+    const seats: WireSeat[] = [];
+    for (let i = 0; i < this.config.maxSeats; i++) {
+      const s = occupied.get(i);
+      if (!s) {
+        seats.push({
+          seat: i,
+          playerId: null,
+          displayName: null,
+          stack: "0",
+          committedThisStreet: "0",
+          hasFolded: false,
+          isAllIn: false,
+          inHand: false,
+          sittingOut: false,
+          lastAction: null,
+        });
+        continue;
+      }
+      const es = this.hand?.seats.find((x) => x.playerId === s.playerId);
+      const la = this.lastActionBySeat.get(s.seatNumber);
+      seats.push({
+        seat: i,
+        // Opaque per-table token, never the real user id (privacy).
+        playerId: this.tokenFor(s.playerId),
+        displayName: s.displayName,
+        stack: (es?.stack ?? s.stack).toString(),
+        committedThisStreet: (es?.committedThisStreet ?? 0n).toString(),
+        hasFolded: es?.hasFolded ?? false,
+        isAllIn: es?.isAllIn ?? false,
+        inHand: es?.inHand ?? false,
+        sittingOut: s.sittingOut,
+        lastAction: la
+          ? { action: la.action, amount: la.amount.toString() }
+          : null,
       });
+    }
 
     return {
       tableId: this.config.tableId,
