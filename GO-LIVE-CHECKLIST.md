@@ -58,6 +58,20 @@ If all 5 pass, the deposit-attribution → ledger → signed-withdrawal path is 
 
 ## §2 — Operational readiness
 
+### 2.0 ⚠️ GitHub auto-deploy is BROKEN on both services (blocker)
+Pushing to `main` does **not** redeploy `web` or `ws` — they were both running stale
+code for a long time (this is what hid the bot removal, private rake, and the live
+lobby seat counts). Until fixed, every change must be shipped manually:
+```bash
+railway up --service ws --detach     # ws (realtime + money workers)
+railway up --service web --detach    # web (Next.js)
+```
+- [ ] Railway → `web` service → Settings → **Source**: reconnect the GitHub repo + branch `main`, enable **"Deploy on push"**
+- [ ] Same for the `ws` service
+- [ ] Confirm a trivial push to `main` triggers a deploy on both
+- [ ] Note: `ws` holds in-memory room state — keep it at **exactly 1 replica** (Settings → Deploy → Replicas = 1). With >1 replica, players split across instances and can't see each other. A Redis pub/sub backplane is the proper multi-replica fix (post-launch).
+
+
 ### 2.1 Error / crash monitoring  ⚠️ currently the weakest spot
 - [ ] **Set `ALERT_WEBHOOK_URL`** on the `ws` service to a Slack or Discord webhook.
       Without it you are blind to: HIGH/CRITICAL risk events *and* ws crashes.
