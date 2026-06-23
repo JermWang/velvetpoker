@@ -6,7 +6,8 @@
  * atomically. No code outside this module may touch the Balance table.
  */
 
-import type { Asset, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { Asset } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import {
   assertBalanced,
@@ -70,15 +71,39 @@ async function applyBalanceDelta(
   const sign = l.direction === "CREDIT" ? 1n : -1n;
   const delta = sign * l.amount;
 
-  const balance = await db.balance.upsert({
+  // Ensure the row exists so the row-lock below has something to take. The
+  // empty `update` makes a concurrent existing-row upsert a no-op; the real
+  // serialization is the SELECT ... FOR UPDATE that follows.
+  await db.balance.upsert({
     where: { userId_asset: { userId, asset } },
     create: { userId, asset },
     update: {},
   });
 
-  let available = balance.availableAmount;
-  let locked = balance.lockedAmount;
-  let referralEarnings = balance.referralEarningsAmount;
+  // PESSIMISTIC LOCK: take an exclusive row lock for the duration of the
+  // transaction and read the CURRENT committed balance. Without this, two
+  // concurrent debits both read the old balance, both pass the non-negative
+  // guard, and both write — a lost update that lets a user overdraft / conjure
+  // funds (buy in at two tables at once, double-withdraw, etc.). FOR UPDATE
+  // forces the second transaction to block until the first commits, so it sees
+  // the already-reduced balance and its guard correctly rejects the overdraft.
+  const rows = await db.$queryRaw<
+    {
+      availableAmount: bigint;
+      lockedAmount: bigint;
+      referralEarningsAmount: bigint;
+    }[]
+  >(Prisma.sql`
+    SELECT "availableAmount", "lockedAmount", "referralEarningsAmount"
+    FROM "Balance"
+    WHERE "userId" = ${userId} AND "asset" = ${asset}::"Asset"
+    FOR UPDATE
+  `);
+  const row = rows[0];
+
+  let available = row?.availableAmount ?? 0n;
+  let locked = row?.lockedAmount ?? 0n;
+  let referralEarnings = row?.referralEarningsAmount ?? 0n;
 
   if (l.accountType === "USER_AVAILABLE") available += delta;
   else if (l.accountType === "USER_TABLE_LOCKED") locked += delta;

@@ -329,7 +329,16 @@ function progress(state: HandState, fromSeat: number): void {
       return;
     }
 
-    // Betting round complete for this street.
+    // Betting round complete for this street. If at most one player can still
+    // act (everyone else is folded or all-in), no further betting is possible —
+    // run the board out to showdown instead of re-prompting the lone player on
+    // every street (which previously let them fold an already-decided hand and
+    // strand the uncalled chips).
+    if (ableToAct(state).length <= 1) {
+      finish(state);
+      return;
+    }
+
     if (state.street === "RIVER") {
       finish(state);
       return;
@@ -340,6 +349,12 @@ function progress(state: HandState, fromSeat: number): void {
 }
 
 function finish(state: HandState): void {
+  // Return any uncalled bet to its owner BEFORE building pots. When a betting
+  // round closed with one player committed for more than anyone else could match
+  // (all others folded or all-in for less), the unmatched excess was never
+  // called — it must go back to that player, not form an unwinnable side pot.
+  refundUncalledBet(state);
+
   // Reveal full board only if multiple players remain (a showdown). When
   // everyone folds to one player the board stays as-is.
   if (nonFolded(state).length > 1) {
@@ -350,6 +365,34 @@ function finish(state: HandState): void {
   state.toActSeat = null;
   settleHand(state);
   recomputePots(state);
+}
+
+/**
+ * Return an uncalled bet to its owner. If, on the current street, exactly one
+ * player committed more than the next-highest commitment (because everyone else
+ * folded or is all-in for less), the difference was never called and is returned
+ * to that player. Operates on `committedThisStreet`, so it MUST run before the
+ * street resets (i.e. at hand end, never after advanceStreet).
+ */
+function refundUncalledBet(state: HandState): void {
+  const commits = state.seats
+    .filter((s) => s.committedThisStreet > 0n)
+    .sort((a, b) =>
+      a.committedThisStreet < b.committedThisStreet
+        ? 1
+        : a.committedThisStreet > b.committedThisStreet
+          ? -1
+          : 0,
+    );
+  if (commits.length === 0) return;
+  const top = commits[0]!;
+  const secondHighest = commits[1]?.committedThisStreet ?? 0n;
+  const uncalled = top.committedThisStreet - secondHighest;
+  if (uncalled <= 0n) return; // top level shared by 2+ players → it was called
+  top.stack += uncalled;
+  top.committedThisStreet -= uncalled;
+  top.committedTotal -= uncalled;
+  if (top.stack > 0n) top.isAllIn = false;
 }
 
 export function advanceStreet(state: HandState): HandState {

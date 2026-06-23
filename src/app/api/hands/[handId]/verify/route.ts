@@ -14,10 +14,28 @@ export async function GET(
   _req: Request,
   { params }: { params: { handId: string } },
 ) {
-  const hand = await prisma.hand.findUnique({
-    where: { id: params.handId },
-    include: { rngProof: true },
-  });
+  // Accept BOTH forms: the cuid Hand.id (used from history) and the realtime
+  // room's composite "tableId:handNumber" (used from the live table). The live
+  // table only knows the composite id, so without this the verify drawer 404s
+  // for every in-progress hand.
+  const raw = decodeURIComponent(params.handId);
+  const colon = raw.lastIndexOf(":");
+  const hand = await (async () => {
+    if (colon > 0) {
+      const tableId = raw.slice(0, colon);
+      const handNumber = Number(raw.slice(colon + 1));
+      if (tableId && Number.isFinite(handNumber)) {
+        return prisma.hand.findUnique({
+          where: { tableId_handNumber: { tableId, handNumber } },
+          include: { rngProof: true },
+        });
+      }
+    }
+    return prisma.hand.findUnique({
+      where: { id: raw },
+      include: { rngProof: true },
+    });
+  })();
   if (!hand) {
     return NextResponse.json({ error: "Hand not found" }, { status: 404 });
   }

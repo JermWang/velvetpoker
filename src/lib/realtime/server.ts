@@ -302,17 +302,38 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
         });
         break;
       }
+      // Seat the player. If seating fails for ANY reason (full table, or a race
+      // where a concurrent BUY_IN took the seat / already seated us while we
+      // awaited the ledger), the funds we just locked have no seat backing them —
+      // refund them immediately so they are never stranded in table-locked.
       const seatNumber = event.seatNumber ?? room.firstFreeSeat();
-      if (seatNumber === null) {
-        sendTo(client, { t: "ERROR", message: "No free seat" });
+      const seated =
+        seatNumber !== null &&
+        room.sit({
+          playerId: userId,
+          displayName: client.displayName,
+          seatNumber,
+          stack: amount,
+        });
+      if (!seated) {
+        try {
+          await cashOutSeat({
+            userId,
+            asset: table.asset,
+            amount,
+            tableId: table.id,
+            correlationId: `buyin-refund:${userId}:${Date.now()}`,
+          });
+        } catch (refundErr) {
+          console.error("[ws] buy-in refund failed", refundErr);
+        }
+        // sit() already sent a specific ERROR for the race cases; only the
+        // full-table case needs a message here.
+        if (seatNumber === null) {
+          sendTo(client, { t: "ERROR", message: "No free seat" });
+        }
         break;
       }
-      room.sit({
-        playerId: userId,
-        displayName: client.displayName,
-        seatNumber,
-        stack: amount,
-      });
       break;
     }
     case "PLAYER_ACTION": {
@@ -384,26 +405,46 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
         });
         break;
       }
-      const returned = room.leave(userId);
-      // Demo chips are free — nothing to settle back to the ledger.
-      if (!entry.isDemo && returned > 0n) {
+      // Demo chips are free — just vacate the seat, nothing to settle.
+      if (entry.isDemo) {
+        room.leave(userId);
+        entry.clients.delete(client);
+        break;
+      }
+
+      // Real money: settle the stack back to the ledger BEFORE removing the seat,
+      // so a transient ledger failure can never destroy the player's funds (the
+      // old order deleted the seat first, stranding the stack in table-locked on
+      // any error). Mark them sitting-out while we await so they can't be dealt
+      // into a new hand mid-settlement; restore on failure.
+      const returned = room.stackOf(userId);
+      if (returned > 0n) {
         const table = await prisma.pokerTable.findUnique({
           where: { id: event.tableId },
         });
-        if (table) {
-          try {
-            await cashOutSeat({
-              userId,
-              asset: table.asset,
-              amount: returned,
-              tableId: table.id,
-              correlationId: `cashout:${userId}:${Date.now()}`,
-            });
-          } catch (err) {
-            console.error("[ws] cashOutSeat failed", err);
-          }
+        if (!table) {
+          sendTo(client, { t: "ERROR", message: "Couldn't cash out right now — please try again." });
+          break;
+        }
+        room.setSitOut(userId, true);
+        try {
+          await cashOutSeat({
+            userId,
+            asset: table.asset,
+            amount: returned,
+            tableId: table.id,
+            correlationId: `cashout:${userId}:${Date.now()}`,
+          });
+        } catch (err) {
+          console.error("[ws] cashOutSeat failed", err);
+          // Funds are still safely locked and the seat is intact — restore the
+          // player so nothing is lost, and let them retry leaving.
+          room.setSitOut(userId, false);
+          sendTo(client, { t: "ERROR", message: "Couldn't cash out right now — please try again." });
+          break;
         }
       }
+      room.leave(userId);
       entry.clients.delete(client);
       break;
     }

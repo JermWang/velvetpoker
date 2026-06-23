@@ -4,6 +4,17 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
+interface VerifyAnchor {
+  anchored: boolean;
+  status?: string;
+  merkleRoot?: string;
+  rootMatches?: boolean;
+  txSignature?: string | null;
+  explorerUrl?: string | null;
+  handCount?: number;
+  confirmedAt?: string | null;
+}
+
 interface VerifyResponse {
   proof: {
     algorithm: string;
@@ -15,20 +26,37 @@ interface VerifyResponse {
     deckHash: string;
   };
   result: { ok: boolean; reasons: string[] };
+  anchor?: VerifyAnchor;
 }
 
 export function VerifyHandDrawer({ handId }: { handId: string | null }) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<VerifyResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     if (!handId) return;
     setOpen(true);
     setLoading(true);
-    const res = await fetch(`/api/hands/${handId}/verify`);
-    setData(res.ok ? await res.json() : null);
-    setLoading(false);
+    setError(null);
+    setData(null);
+    try {
+      const res = await fetch(`/api/hands/${encodeURIComponent(handId)}/verify`);
+      if (!res.ok) {
+        setError(
+          res.status === 404
+            ? "This hand isn't recorded yet — verification is available once the hand completes."
+            : "Couldn't load verification right now. Please try again.",
+        );
+      } else {
+        setData(await res.json());
+      }
+    } catch {
+      setError("Couldn't reach the server. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -51,6 +79,10 @@ export function VerifyHandDrawer({ handId }: { handId: string | null }) {
             </div>
 
             {loading && <p className="mt-6 text-sm text-ash">Recomputing deck…</p>}
+
+            {error && !loading && (
+              <p className="mt-6 text-sm text-amber-300">{error}</p>
+            )}
 
             {data && (
               <div className="mt-6 space-y-4 text-sm">
@@ -92,6 +124,52 @@ export function VerifyHandDrawer({ handId }: { handId: string | null }) {
                   pre-published hash, then recompute the deck to match the deck
                   hash.
                 </p>
+
+                <div className="mt-4 border-t border-white/10 pt-4">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ash">
+                    On-chain anchor
+                  </p>
+                  {data.anchor?.anchored ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        {data.anchor.rootMatches ? (
+                          <Badge tone="green">Root matches on-chain</Badge>
+                        ) : (
+                          <Badge tone="red">Root mismatch</Badge>
+                        )}
+                      </div>
+                      <Field
+                        label="Merkle root (posted on-chain)"
+                        value={data.anchor.merkleRoot ?? "—"}
+                        mono
+                      />
+                      {data.anchor.explorerUrl && (
+                        <div>
+                          <p className="text-xs text-ash">Anchor transaction</p>
+                          <a
+                            href={data.anchor.explorerUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-0.5 inline-block break-all font-mono text-xs text-velvet-soft underline decoration-velvet-soft/40 underline-offset-2 hover:text-velvet"
+                          >
+                            View on Solscan ↗
+                          </a>
+                        </div>
+                      )}
+                      <p className="pt-1 text-xs leading-relaxed text-ash/70">
+                        This hand&apos;s outcome was hashed into a Merkle root
+                        committed on-chain. Fold the inclusion proof into the leaf
+                        to confirm it matches the posted root — proof the payout
+                        wasn&apos;t altered after the fact.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs leading-relaxed text-ash/70">
+                      Not yet anchored. Completed hands are batched and committed
+                      on-chain shortly after play; check back in a few minutes.
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </aside>

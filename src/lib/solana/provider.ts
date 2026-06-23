@@ -26,10 +26,15 @@ export interface SolanaProvider {
   readonly name: string;
   /** Confirmations for a given signature (0 if unknown / dropped). */
   getConfirmations(signature: string): Promise<number>;
-  /** Incoming transfers to a watched address since an optional cursor slot. */
+  /**
+   * Incoming transfers to a watched address. Pages through ALL signatures newer
+   * than `untilSignature` (an RPC-side cursor — the last signature already
+   * processed), so no transfer is missed under load. Omit the cursor to scan the
+   * most recent page as a baseline.
+   */
   getIncomingTransfers(
     address: string,
-    sinceSlot?: number,
+    untilSignature?: string,
   ): Promise<IncomingTransfer[]>;
   /** Send an outbound transfer from the hot wallet. SERVER ONLY. */
   sendTransfer(params: {

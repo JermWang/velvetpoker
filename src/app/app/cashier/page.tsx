@@ -4,6 +4,7 @@ import { getUserBalances } from "@/lib/queries";
 import { canPlayRealMoney } from "@/lib/compliance/gates";
 import { formatAmount, ASSET_SYMBOLS } from "@/lib/ledger/money";
 import { env, isTokenConfigured } from "@/lib/env";
+import { solscanTxUrl } from "@/lib/solana/explorer";
 import { CashierPanel } from "@/components/cashier/cashier-panel";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/badge";
@@ -65,11 +66,21 @@ export default async function CashierPage() {
             ) : (
               <ul className="divide-y divide-white/5">
                 {deposits.map((d) => (
-                  <li key={d.id} className="flex items-center justify-between py-2 text-sm">
+                  <li key={d.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                     <span className="font-mono text-ivory">
                       {formatAmount(d.asset, d.amount)} {ASSET_SYMBOLS[d.asset]}
                     </span>
-                    <StatusBadge status={d.status} />
+                    <div className="flex items-center gap-3">
+                      <a
+                        href={solscanTxUrl(d.txSignature)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-velvet-soft underline decoration-velvet-soft/40 underline-offset-2 hover:text-velvet"
+                      >
+                        Solscan ↗
+                      </a>
+                      <StatusBadge status={d.status} />
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -84,11 +95,23 @@ export default async function CashierPage() {
             ) : (
               <ul className="divide-y divide-white/5">
                 {withdrawals.map((w) => (
-                  <li key={w.id} className="flex items-center justify-between py-2 text-sm">
+                  <li key={w.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                     <span className="font-mono text-ivory">
                       {formatAmount(w.asset, w.amount)} {ASSET_SYMBOLS[w.asset]}
                     </span>
-                    <StatusBadge status={w.status} />
+                    <div className="flex items-center gap-3">
+                      {w.txSignature && (
+                        <a
+                          href={solscanTxUrl(w.txSignature)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-velvet-soft underline decoration-velvet-soft/40 underline-offset-2 hover:text-velvet"
+                        >
+                          Solscan ↗
+                        </a>
+                      )}
+                      <StatusBadge status={w.status} />
+                    </div>
                   </li>
                 ))}
               </ul>

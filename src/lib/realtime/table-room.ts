@@ -214,20 +214,26 @@ export class TableRoom {
     );
   }
 
+  /**
+   * Seat a player. Returns true on success, false if the player already holds a
+   * seat or the requested seat is taken (an ERROR is sent in those cases). The
+   * caller MUST check the result for real-money buy-ins so it can refund the
+   * just-locked funds when seating fails (otherwise the lock is orphaned).
+   */
   sit(params: {
     playerId: string;
     displayName: string;
     seatNumber: number;
     stack: bigint;
-  }): void {
+  }): boolean {
     // A player may hold only one seat — never multiple.
     if (this.findSeatByPlayer(params.playerId)) {
       this.send(params.playerId, { t: "ERROR", message: "You're already seated" });
-      return;
+      return false;
     }
     if (this.seats.has(params.seatNumber)) {
       this.send(params.playerId, { t: "ERROR", message: "Seat taken" });
-      return;
+      return false;
     }
     this.seats.set(params.seatNumber, {
       seatNumber: params.seatNumber,
@@ -239,6 +245,7 @@ export class TableRoom {
     });
     this.broadcastSeats();
     this.maybeStartHand();
+    return true;
   }
 
   /** Add chips to a seated player between hands (top-up/rebuy). */
@@ -743,7 +750,13 @@ export class TableRoom {
     // player — that player mucks unseen, so we never put their cards on the wire.
     const pub = serializePublicState(hand);
     if (pub.results && pub.results.length > 0) {
-      const contested = pub.results.length > 1;
+      // A contested showdown means two or more NON-folded players reached the
+      // end. Counting all result rows (which include folded contributors) would
+      // both mislabel an uncontested win and — combined with r.cards — leak a
+      // folded player's hole cards. The engine already redacts r.cards for
+      // folded / non-showdown players; the !r.hasFolded guard is belt-and-braces.
+      const contested =
+        pub.results.filter((r) => !r.hasFolded).length > 1;
       this.broadcast({
         t: "SHOWDOWN",
         tableId: this.config.tableId,
@@ -752,8 +765,8 @@ export class TableRoom {
           seat: r.seat,
           playerId: this.tokenFor(r.playerId),
           amountWon: r.amountWon.toString(),
-          handDescription: contested ? r.handDescription : "Won uncontested",
-          cards: contested ? r.cards : [],
+          handDescription: contested && !r.hasFolded ? r.handDescription : r.hasFolded ? "Folded" : "Won uncontested",
+          cards: contested && !r.hasFolded ? r.cards : [],
         })),
       });
     }
@@ -847,15 +860,21 @@ export class TableRoom {
       serverSeed: this.serverSeed ?? "",
       potAmount: hand.totalPot,
       rake,
-      // Persist hole cards ONLY for a contested showdown — an uncontested win
-      // mucks unseen, so the winner's cards are never stored (matches the wire).
-      results: (pub.results ?? []).map((r) => ({
-        seat: r.seat,
-        playerId: r.playerId,
-        amountWon: r.amountWon,
-        handDescription: r.handDescription,
-        cards: (pub.results?.length ?? 0) > 1 ? r.cards : [],
-      })),
+      // Persist hole cards ONLY for non-folded players at a contested showdown —
+      // an uncontested win mucks unseen and a folded player NEVER reveals, so
+      // their cards are never stored (matches the wire). r.cards is already
+      // redacted by the engine; the guards here are defense-in-depth.
+      results: (pub.results ?? []).map((r) => {
+        const contested =
+          (pub.results ?? []).filter((x) => !x.hasFolded).length > 1;
+        return {
+          seat: r.seat,
+          playerId: r.playerId,
+          amountWon: r.amountWon,
+          handDescription: r.handDescription,
+          cards: contested && !r.hasFolded ? r.cards : [],
+        };
+      }),
       actions: hand.actionLog.map((a) => ({
         seat: a.seat,
         playerId: a.playerId,

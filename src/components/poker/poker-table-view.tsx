@@ -400,9 +400,12 @@ export function PokerTableView(props: PokerTableViewProps) {
         </div>
       </div>
 
-      {/* Table on the left, betting + chat panel on the right. They stack on
-          small screens and sit side-by-side from lg up. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 lg:flex-row lg:gap-3">
+      {/* Table on the left, betting + chat panel on the right. They sit
+          side-by-side from lg up AND in any landscape orientation — phones are
+          nudged to landscape (RotatePrompt), where a stacked column would crush
+          the felt under the action panel in this fixed-height, non-scrolling
+          viewport. Portrait phones keep the stacked column. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 landscape:flex-row landscape:gap-3 lg:flex-row lg:gap-3">
         {/* Felt — a bounded oval table; top padding gives the top-row seats headroom. */}
         <div
           className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-3xl pb-2 pt-3 shadow-elevated sm:pb-10 sm:pt-12"
@@ -643,8 +646,10 @@ export function PokerTableView(props: PokerTableViewProps) {
         </div>
 
         {/* Right-side panel: betting/action + chat. Stacks below the felt on
-            small screens; a fixed column on the right from lg up. */}
-        <aside className="flex shrink-0 flex-col gap-2.5 lg:w-[340px]">
+            portrait phones; a fixed, internally-scrollable column on the right in
+            landscape and from lg up (so the controls are always reachable even on
+            short landscape-phone viewports). */}
+        <aside className="flex min-h-0 shrink-0 flex-col gap-2.5 overflow-y-auto landscape:w-[300px] lg:w-[340px]">
         {/* Action / buy-in */}
         <div className="shrink-0">
         {isSpectator ? (

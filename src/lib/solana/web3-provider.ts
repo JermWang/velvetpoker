@@ -13,6 +13,7 @@
 
 import {
   Connection,
+  type ConfirmedSignatureInfo,
   Keypair,
   PublicKey,
   SystemProgram,
@@ -37,8 +38,11 @@ import type {
 
 /** Confirmation count we report for finalized transactions. */
 const FINALIZED = 1_000_000;
-/** How many recent signatures to scan per address per poll. */
-const SIGNATURE_SCAN_LIMIT = 40;
+/** Signatures fetched per RPC page (Solana's max is 1000). */
+const SIGNATURE_SCAN_LIMIT = 1000;
+/** Safety cap on pages per poll (SIGNATURE_SCAN_LIMIT * this = max backlog
+ * drained per poll). Hitting it logs a backlog warning. */
+const MAX_SCAN_PAGES = 10;
 /** SPL Memo program (v2). */
 const MEMO_PROGRAM_ID = new PublicKey(
   "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
@@ -82,17 +86,40 @@ export class Web3SolanaProvider implements SolanaProvider {
 
   async getIncomingTransfers(
     address: string,
-    sinceSlot?: number,
+    untilSignature?: string,
   ): Promise<IncomingTransfer[]> {
     const owner = new PublicKey(address);
-    const sigInfos = await this.connection.getSignaturesForAddress(owner, {
-      limit: SIGNATURE_SCAN_LIMIT,
-    });
+
+    // Page backwards from the newest signature down to the cursor (`until`), so
+    // EVERY signature since the last poll is processed — not just the most recent
+    // page. Without this, under load (>1 page of treasury txs between polls) a
+    // pending deposit could scroll out of the window before it confirms and be
+    // lost. The page cap bounds work per poll; hitting it signals a backlog.
+    const sigInfos: ConfirmedSignatureInfo[] = [];
+    let before: string | undefined;
+    let hitCap = true;
+    for (let page = 0; page < MAX_SCAN_PAGES; page++) {
+      const batch = await this.connection.getSignaturesForAddress(owner, {
+        limit: SIGNATURE_SCAN_LIMIT,
+        before,
+        until: untilSignature,
+      });
+      sigInfos.push(...batch);
+      if (batch.length < SIGNATURE_SCAN_LIMIT) {
+        hitCap = false;
+        break;
+      }
+      before = batch[batch.length - 1]!.signature;
+    }
+    if (hitCap) {
+      console.warn(
+        `[solana] deposit scan for ${address} hit the ${MAX_SCAN_PAGES}-page cap — possible backlog, will continue next poll`,
+      );
+    }
 
     const transfers: IncomingTransfer[] = [];
     for (const info of sigInfos) {
       if (info.err) continue;
-      if (sinceSlot && info.slot <= sinceSlot) continue;
 
       const tx = await this.connection.getParsedTransaction(info.signature, {
         maxSupportedTransactionVersion: 0,

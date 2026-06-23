@@ -85,16 +85,64 @@ export async function ingestTransfer(params: {
 }
 
 /**
+ * Re-check every recorded-but-uncredited deposit by its signature and credit it
+ * once it reaches the confirmation threshold. This is INDEPENDENT of the treasury
+ * scan window: once a deposit has been recorded (status DETECTED/CONFIRMED), it is
+ * polled directly by signature until credited, so a deposit can never be lost just
+ * because its signature scrolled out of the recent-signatures scan under load.
+ */
+export async function recheckPendingDeposits(): Promise<{ credited: number }> {
+  const provider = getSolanaProvider();
+  const pending = await prisma.deposit.findMany({
+    where: { chain: "SOLANA", status: { in: ["DETECTED", "CONFIRMED"] } },
+  });
+
+  let credited = 0;
+  for (const d of pending) {
+    const confirmations = await provider.getConfirmations(d.txSignature);
+    if (confirmations <= 0) continue;
+    const res = await ingestTransfer({
+      userId: d.userId,
+      asset: d.asset,
+      toAddress: d.toAddress,
+      fromAddress: d.fromAddress,
+      txSignature: d.txSignature,
+      amount: d.amount,
+      confirmations,
+    });
+    if (res.credited) credited++;
+  }
+  return { credited };
+}
+
+/**
  * Scan the treasury address for incoming transfers and credit each to the user
  * whose linked wallet sent it. Transfers from unknown wallets are skipped (left
  * for manual review). Used by the deposit-monitor job and on-demand.
+ *
+ * Uses the most recently recorded deposit as an RPC-side cursor so only NEW
+ * signatures are fetched/parsed each poll, and always re-checks already-recorded
+ * pending deposits so none are lost to the scan window.
  */
 export async function scanTreasuryDeposits(): Promise<{ credited: number; unattributed: number }> {
   const treasury = env.treasuryWalletAddress;
   if (!treasury) return { credited: 0, unattributed: 0 };
 
   const provider = getSolanaProvider();
-  const transfers = await provider.getIncomingTransfers(treasury);
+
+  // Cursor: the newest deposit we've already recorded for this treasury. The
+  // provider pages back only to here, so we never re-parse the whole history and
+  // never miss a signature newer than it.
+  const newest = await prisma.deposit.findFirst({
+    where: { chain: "SOLANA", toAddress: treasury },
+    orderBy: { createdAt: "desc" },
+    select: { txSignature: true },
+  });
+
+  const transfers = await provider.getIncomingTransfers(
+    treasury,
+    newest?.txSignature,
+  );
   let credited = 0;
   let unattributed = 0;
 
@@ -121,5 +169,10 @@ export async function scanTreasuryDeposits(): Promise<{ credited: number; unattr
     });
     if (res.credited) credited++;
   }
+
+  // Independently advance any recorded-but-uncredited deposits toward CREDITED.
+  const recheck = await recheckPendingDeposits();
+  credited += recheck.credited;
+
   return { credited, unattributed };
 }

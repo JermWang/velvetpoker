@@ -58,6 +58,9 @@ export interface Pot {
   amount: bigint;
   /** Seats eligible to win this pot. */
   eligibleSeats: number[];
+  /** All seats that contributed chips to this pot (eligible OR folded). Used to
+   * refund a pot that has no eligible winner instead of destroying its chips. */
+  contributors: number[];
 }
 
 export interface HandConfig {
@@ -121,7 +124,11 @@ export interface HandResult {
   /** Net for the hand = amountWon - committedTotal. */
   net: bigint;
   handDescription: string;
+  /** Hole cards — populated ONLY for non-folded players at a contested showdown;
+   * always empty for folded players and for uncontested (everyone-folded) wins. */
   cards: Card[];
+  /** Whether this player folded out of the hand (never reveal their cards). */
+  hasFolded: boolean;
 }
 
 /** Public, redacted view broadcast to everyone (no hole cards unless shown). */

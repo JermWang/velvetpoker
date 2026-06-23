@@ -16,6 +16,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { env } from "@/lib/env";
 import { getSolanaProvider } from "@/lib/solana/connection";
+import { solscanTxUrl } from "@/lib/solana/explorer";
 import {
   ANCHOR_ALGORITHM,
   buildAnchorMemo,
@@ -164,11 +165,8 @@ export async function buildHandAnchorProof(
   const leaf = leaves[index]!;
   const computedRoot = rootFromProof(leaf, proof);
 
-  const network = env.solanaNetwork;
-  const cluster =
-    network === "mainnet-beta" ? "" : `?cluster=${network}`;
   const explorerUrl = hand.anchor.txSignature
-    ? `https://explorer.solana.com/tx/${hand.anchor.txSignature}${cluster}`
+    ? solscanTxUrl(hand.anchor.txSignature)
     : null;
 
   return {

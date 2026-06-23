@@ -31,7 +31,7 @@ export class MockSolanaProvider implements SolanaProvider {
 
   async getIncomingTransfers(
     address: string,
-    _sinceSlot?: number,
+    _untilSignature?: string,
   ): Promise<IncomingTransfer[]> {
     return this.pending.get(address) ?? [];
   }

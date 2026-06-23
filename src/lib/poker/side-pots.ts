@@ -38,21 +38,28 @@ export function calculateSidePots(seats: SeatState[]): Pot[] {
     const atOrAbove = contributors.filter((c) => c.committed >= level);
     const amount = layer * BigInt(atOrAbove.length);
     if (amount > 0n) {
+      const contributors = atOrAbove.map((c) => c.seat).sort((a, b) => a - b);
       const eligibleSeats = atOrAbove
         .filter((c) => c.eligible)
         .map((c) => c.seat)
         .sort((a, b) => a - b);
-      pots.push({ amount, eligibleSeats });
+      pots.push({ amount, eligibleSeats, contributors });
     }
     prev = level;
   }
 
   // Merge consecutive pots whose eligible sets are identical (cleaner display,
-  // identical settlement result).
+  // identical settlement result). NEVER merge a pot with no eligible winner —
+  // those are refunded to their exact contributors at settlement, so each must
+  // retain its own contributor set.
   const merged: Pot[] = [];
   for (const pot of pots) {
     const last = merged[merged.length - 1];
-    if (last && sameSeats(last.eligibleSeats, pot.eligibleSeats)) {
+    if (
+      last &&
+      pot.eligibleSeats.length > 0 &&
+      sameSeats(last.eligibleSeats, pot.eligibleSeats)
+    ) {
       last.amount += pot.amount;
     } else {
       merged.push({ ...pot });

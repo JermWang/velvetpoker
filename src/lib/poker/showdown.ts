@@ -30,6 +30,12 @@ export function settleHand(state: HandState): HandResult[] {
   const community = state.community;
   const pots = calculateSidePots(state.seats);
 
+  // A genuine showdown happened iff two or more players reached the end without
+  // folding. Hole cards are revealed ONLY in that case, and ONLY for the players
+  // who did not fold — a folded player always mucks unseen.
+  const isShowdown =
+    state.seats.filter((s) => s.inHand && !s.hasFolded).length > 1;
+
   // Pre-evaluate each contender's best hand once.
   const evals = new Map<number, SeatEval>();
   for (const seat of state.seats) {
@@ -49,7 +55,32 @@ export function settleHand(state: HandState): HandResult[] {
     const potAmount = pot.amount;
 
     const winners = determineWinners(pot.eligibleSeats, evals);
-    if (winners.length === 0) continue;
+    if (winners.length === 0) {
+      // No eligible winner means every contributor to this layer folded. Those
+      // chips must be returned to the contributors (each contributed an equal
+      // share of an unmerged layer), NOT silently dropped — dropping them would
+      // destroy chips and break the ledger's balanced-transaction invariant.
+      // With the engine's uncalled-bet refund this path should be unreachable;
+      // it exists purely as a conservation backstop.
+      if (pot.contributors.length > 0) {
+        const refund = potAmount / BigInt(pot.contributors.length);
+        let rem = potAmount % BigInt(pot.contributors.length);
+        const ordered = orderBySeatPosition(
+          pot.contributors,
+          state.dealerSeat,
+          state.seats,
+        );
+        for (const seat of ordered) {
+          let award = refund;
+          if (rem > 0n) {
+            award += 1n;
+            rem -= 1n;
+          }
+          winnings.set(seat, (winnings.get(seat) ?? 0n) + award);
+        }
+      }
+      continue;
+    }
 
     const share = potAmount / BigInt(winners.length);
     let remainder = potAmount % BigInt(winners.length);
@@ -84,7 +115,10 @@ export function settleHand(state: HandState): HandResult[] {
         handDescription:
           descriptions.get(seat.seat) ??
           (seat.hasFolded ? "Folded" : ev?.ranking?.description ?? "—"),
-        cards: seat.holeCards,
+        // Never expose a folded player's cards, and never expose anyone's cards
+        // on an uncontested win — only non-folded players at a real showdown.
+        cards: isShowdown && !seat.hasFolded ? seat.holeCards : [],
+        hasFolded: seat.hasFolded,
       });
     }
   }
