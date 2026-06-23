@@ -28,23 +28,27 @@ function tokenUnits(usd: number, tokenUsd: number, decimals: number): bigint {
   return BigInt(Math.round((usd / tokenUsd) * 10 ** decimals));
 }
 
-// Dollar-defined tiers. The highest is always branded "The Velvet Room".
+// Dollar-defined tiers, each with its own display name.
 interface Tier {
   code: string;
+  name: string;
   usd: number; // headline buy-in (display label)
   sbUsd: number;
   bbUsd: number;
   minUsd: number;
   maxUsd: number;
 }
-// Two cash options: a $20 entry tier and the flagship "The Velvet Room" ($100).
+// Several $20 tables (so there's always an open seat at the entry stake) plus
+// the flagship "The Velvet Room" ($100).
+const MICRO = { usd: 20, sbUsd: 0.1, bbUsd: 0.2, minUsd: 10, maxUsd: 20 } as const;
 const TIERS: Tier[] = [
-  { code: "HOUSE-MICRO", usd: 20, sbUsd: 0.1, bbUsd: 0.2, minUsd: 10, maxUsd: 20 },
-  { code: "HOUSE-MID", usd: 100, sbUsd: 0.5, bbUsd: 1, minUsd: 50, maxUsd: 100 },
+  { code: "HOUSE-MICRO", name: "Velvet — $20 #1", ...MICRO },
+  { code: "HOUSE-MICRO-2", name: "Velvet — $20 #2", ...MICRO },
+  { code: "HOUSE-MICRO-3", name: "Velvet — $20 #3", ...MICRO },
+  { code: "HOUSE-MICRO-4", name: "Velvet — $20 #4", ...MICRO },
+  { code: "HOUSE-MID", name: "The Velvet Room", usd: 100, sbUsd: 0.5, bbUsd: 1, minUsd: 50, maxUsd: 100 },
 ];
-const HIGHEST_USD = Math.max(...TIERS.map((t) => t.usd));
-const nameFor = (t: Tier) =>
-  t.usd === HIGHEST_USD ? "The Velvet Room" : `Velvet — $${t.usd}`;
+const nameFor = (t: Tier) => t.name;
 
 export interface HouseRoom {
   code: string;
