@@ -812,7 +812,7 @@ function seatPosition(
   // rx leaves room for the ~100px-wide seat clusters at the sides; ry is kept
   // modest and the ring sits a touch low so the TOP-row seats keep their cards
   // clear of the felt edge (with the felt's top padding adding more headroom).
-  return { x: 50 + 37 * Math.cos(angle), y: 50 + 31 * Math.sin(angle) };
+  return { x: 50 + 44 * Math.cos(angle), y: 50 + 37 * Math.sin(angle) };
 }
 
 /**
