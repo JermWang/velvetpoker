@@ -514,8 +514,11 @@ export function PokerTableView(props: PokerTableViewProps) {
               seatCount,
               isMobile,
             );
-            const bx = pos.x + (50 - pos.x) * 0.34;
-            const by = pos.y + (48 - pos.y) * 0.34;
+            // Push the bet chip well in toward the table center so it sits on
+            // open felt between the player's pod and the board — never on top of
+            // the name/stack pill (worst on the top seats, whose pod extends in).
+            const bx = pos.x + (50 - pos.x) * 0.52;
+            const by = pos.y + (50 - pos.y) * 0.52;
             return (
               <div
                 key={`bet-${s.seat}`}
