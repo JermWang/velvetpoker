@@ -15,6 +15,7 @@ import {
 } from "@/lib/sound/sound";
 import { Seat } from "./seat";
 import { useTableMedia } from "@/lib/media/use-table-media";
+import { RotatePrompt } from "./rotate-prompt";
 import { PlayingCard } from "./playing-card";
 import { ActionBar } from "./action-bar";
 import { BuyInPanel } from "./buy-in-panel";
@@ -251,6 +252,8 @@ export function PokerTableView(props: PokerTableViewProps) {
   // everything else is compact, so the page itself never scrolls.
   return (
     <div className="flex h-[calc(100dvh-8rem)] flex-col gap-2.5">
+      {/* Phones: nudge to landscape (the table plays far better wide). */}
+      <RotatePrompt />
       {/* Compact header */}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">

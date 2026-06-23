@@ -95,7 +95,15 @@
 }
 .animate-win-rise { animation: vp-win-rise 2.4s ease-out forwards; }
 
+@keyframes vp-rotate-hint {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  75% { transform: rotate(-90deg); }
+  90% { transform: rotate(-90deg); }
+}
+.animate-rotate-hint { animation: vp-rotate-hint 2.4s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
+  .animate-rotate-hint { animation: none; }
   .crt-flicker { animation: none; opacity: 0.4; }
   .animate-fade-up { animation: none; }
   .animate-turn, .animate-attn { animation: none; }
