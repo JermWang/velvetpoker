@@ -259,7 +259,7 @@ export function PokerTableView(props: PokerTableViewProps) {
   // the app header + page padding ≈ 8rem) where the felt absorbs the slack and
   // everything else is compact, so the page itself never scrolls.
   return (
-    <div className="flex h-[calc(100dvh-8rem)] flex-col gap-2.5">
+    <div className="flex h-[calc(100dvh-6.5rem)] flex-col gap-2.5">
       {/* Phones: nudge to landscape (the table plays far better wide). */}
       <RotatePrompt />
       {/* Compact header */}
