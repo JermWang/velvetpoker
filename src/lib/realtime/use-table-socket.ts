@@ -61,30 +61,70 @@ export function useTableSocket({
   }, []);
 
   useEffect(() => {
-    const url = `${wsUrl}?${authQuery}`;
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
+    // Auto-reconnect: without this, ANY dropped socket (server redeploy, brief
+    // network blip, laptop sleep) leaves a dead connection — send() silently
+    // drops every message, so the table looks alive but buttons do nothing.
+    // Reconnect with capped backoff until the component unmounts.
+    let disposed = false;
+    let attempts = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
-    ws.onopen = () => {
-      setState((s) => ({ ...s, connected: true }));
-      ws.send(JSON.stringify({ t: "JOIN_TABLE", tableId }));
-      // Belt-and-suspenders: explicitly ask for a full baseline so a dropped or
-      // out-of-order seat frame can never strand us without table state.
-      ws.send(JSON.stringify({ t: "REQUEST_TABLE_STATE", tableId }));
-    };
-    ws.onclose = () => setState((s) => ({ ...s, connected: false }));
-    ws.onmessage = (msg) => {
-      let event: ServerEvent;
-      try {
-        event = JSON.parse(msg.data as string) as ServerEvent;
-      } catch {
-        return;
+    const connect = async () => {
+      if (disposed) return;
+      // Authed connections use a ws ticket that expires fast. Fetch a FRESH one
+      // on every (re)connect so a reconnect long after page load still
+      // authenticates. Guest/spectator/dev paths use their query as-is.
+      let query = authQuery;
+      if (authQuery.startsWith("ticket=")) {
+        try {
+          const res = await fetch("/api/realtime/ticket", { cache: "no-store" });
+          if (res.ok) {
+            const j = (await res.json()) as { ticket?: string };
+            if (j.ticket) query = `ticket=${encodeURIComponent(j.ticket)}`;
+          }
+        } catch {
+          /* fall back to the page-embedded ticket */
+        }
       }
-      onEventRef.current?.(event);
-      setState((s) => reduce(s, event));
+      if (disposed) return;
+      const url = `${wsUrl}?${query}`;
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        attempts = 0;
+        setState((s) => ({ ...s, connected: true }));
+        ws.send(JSON.stringify({ t: "JOIN_TABLE", tableId }));
+        // Ask for a full baseline so a dropped/out-of-order seat frame can never
+        // strand us without table state.
+        ws.send(JSON.stringify({ t: "REQUEST_TABLE_STATE", tableId }));
+      };
+      ws.onclose = () => {
+        setState((s) => ({ ...s, connected: false }));
+        if (disposed) return;
+        attempts += 1;
+        // 0.5s, 1s, 2s, 4s, capped at 8s.
+        const delay = Math.min(8000, 500 * 2 ** Math.min(attempts - 1, 4));
+        reconnectTimer = setTimeout(connect, delay);
+      };
+      ws.onmessage = (msg) => {
+        let event: ServerEvent;
+        try {
+          event = JSON.parse(msg.data as string) as ServerEvent;
+        } catch {
+          return;
+        }
+        onEventRef.current?.(event);
+        setState((s) => reduce(s, event));
+      };
     };
 
-    return () => ws.close();
+    connect();
+    return () => {
+      disposed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      wsRef.current?.close();
+    };
   }, [wsUrl, tableId, authQuery]);
 
   return { state, send };
