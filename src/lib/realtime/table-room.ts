@@ -129,6 +129,9 @@ export class TableRoom {
   // Demo only: after a lone human waits this long with no opponents, fill the
   // table with bots so they always get a game (and so testing works solo).
   private botFillTimer: ReturnType<typeof setTimeout> | null = null;
+  // On bust, a player keeps their seat for a short window to buy back in before
+  // it's freed (keyed by playerId).
+  private bustTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private hand: HandState | null = null;
   private handNumber = 0;
   private dealerSeat = 0;
@@ -242,7 +245,13 @@ export class TableRoom {
   topUp(playerId: string, amount: bigint): void {
     const seat = this.findSeatByPlayer(playerId);
     if (seat) {
+      const wasBusted = seat.stack === 0n;
       seat.stack += amount;
+      // Bought back in after busting → cancel the grace timer and return to play.
+      if (wasBusted && seat.stack > 0n) {
+        seat.sittingOut = false;
+        this.cancelBustGrace(playerId);
+      }
       this.broadcastSeats();
     }
   }
@@ -256,6 +265,7 @@ export class TableRoom {
   }
 
   leave(playerId: string): bigint {
+    this.cancelBustGrace(playerId);
     const seat = this.findSeatByPlayer(playerId);
     if (!seat) return 0n;
     // A player in an active hand is marked sitting out and removed after the
@@ -312,6 +322,8 @@ export class TableRoom {
   private static readonly DEMO_TARGET_PLAYERS = 5;
   /** Wait this long for real opponents before filling a demo table with bots. */
   private static readonly BOT_FILL_DELAY_MS = 30_000;
+  /** A busted player keeps their seat this long to buy back before it's freed. */
+  private static readonly BUST_GRACE_MS = 30_000;
 
   private isBotSeat(s: RoomSeat): boolean {
     return isBotId(s.playerId);
@@ -377,6 +389,26 @@ export class TableRoom {
     if (this.botFillTimer) {
       clearTimeout(this.botFillTimer);
       this.botFillTimer = null;
+    }
+  }
+
+  /** Give a busted player BUST_GRACE_MS to buy back before freeing their seat. */
+  private startBustGrace(playerId: string): void {
+    if (this.bustTimers.has(playerId)) return;
+    const t = setTimeout(() => {
+      this.bustTimers.delete(playerId);
+      const seat = this.findSeatByPlayer(playerId);
+      // Still busted and didn't buy back → free the seat.
+      if (seat && seat.stack === 0n) this.leave(playerId);
+    }, TableRoom.BUST_GRACE_MS);
+    this.bustTimers.set(playerId, t);
+  }
+
+  private cancelBustGrace(playerId: string): void {
+    const t = this.bustTimers.get(playerId);
+    if (t) {
+      clearTimeout(t);
+      this.bustTimers.delete(playerId);
     }
   }
 
@@ -793,8 +825,12 @@ export class TableRoom {
       const finalStack = es.stack - rakeShare;
       deltas.push({ playerId: es.playerId, net: finalStack - startStack });
       roomSeat.stack = finalStack;
-      // Bust-out: drop to sitting-out between hands.
-      if (roomSeat.stack === 0n) roomSeat.sittingOut = true;
+      // Bust-out: sit them out but keep the seat for a 30s buy-back window
+      // before it's freed (so you stay seated until you bust AND don't rebuy).
+      if (roomSeat.stack === 0n) {
+        roomSeat.sittingOut = true;
+        this.startBustGrace(roomSeat.playerId);
+      }
     }
 
     void this.onHandSettled?.({
