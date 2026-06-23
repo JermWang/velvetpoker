@@ -399,20 +399,18 @@ export function PokerTableView(props: PokerTableViewProps) {
         </div>
       </div>
 
-      {/* Felt — breaks out of the app column to span the full viewport width so
-          the table reads big and immersive, not a small boxed container. */}
+      {/* Felt — a bounded oval table in its own container; top padding gives the
+          top-row seats headroom so their cards aren't clipped at the edge. */}
       <div
-        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden"
+        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-3xl pt-8 shadow-elevated sm:pt-10"
         style={{
-          width: "100vw",
-          marginLeft: "calc(50% - 50vw)",
           background:
-            "radial-gradient(120% 90% at 50% 0%, rgba(27,77,58,0.16), transparent 60%)",
+            "radial-gradient(120% 90% at 50% 8%, rgba(27,77,58,0.18), transparent 55%), #0c0d10",
         }}
       >
         {/* Keep the Claude-design aspect (1180×560) so the oval stays proportional;
             grow it as large as the viewport height allows. */}
-        <div className="relative h-full w-full sm:aspect-[1180/560] sm:h-auto sm:max-h-full sm:max-w-[1500px]">
+        <div className="relative h-full w-full sm:aspect-[1180/560] sm:h-auto sm:max-h-full sm:max-w-5xl">
           {/* Rail + felt surface — insets match the prototype (18px / 96px on
               1180×560 ≈ 3.2% vertical, 8.1% horizontal). */}
           <div className="pointer-events-none absolute" style={{ inset: "3.2% 8.1%" }}>
@@ -800,10 +798,10 @@ function seatPosition(
     // down the length of the felt. Reads far less cluttered on a phone.
     return { x: 50 + 31 * Math.cos(angle), y: 47 + 41 * Math.sin(angle) };
   }
-  // Centred slightly high (48%) so the taller hero cluster at the bottom clears
-  // the felt edge. rx leaves room for the ~100px-wide seat clusters at the
-  // sides; ry stays modest so a 6-max top seat doesn't clip.
-  return { x: 50 + 45 * Math.cos(angle), y: 48 + 33 * Math.sin(angle) };
+  // rx leaves room for the ~100px-wide seat clusters at the sides; ry is kept
+  // modest and the ring sits a touch low so the TOP-row seats keep their cards
+  // clear of the felt edge (with the felt's top padding adding more headroom).
+  return { x: 50 + 45 * Math.cos(angle), y: 50 + 30 * Math.sin(angle) };
 }
 
 /**
