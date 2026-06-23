@@ -73,6 +73,23 @@ export class Web3SolanaProvider implements SolanaProvider {
     this.hotWallet = loadHotWallet();
   }
 
+  async getOnChainBalance(address: string, asset: Asset): Promise<bigint> {
+    const owner = new PublicKey(address);
+    if (asset === "SOL") {
+      return BigInt(await this.connection.getBalance(owner));
+    }
+    const mint = this.splMints[asset];
+    if (!mint) return 0n;
+    const ata = await getAssociatedTokenAddress(mint, owner);
+    try {
+      const bal = await this.connection.getTokenAccountBalance(ata);
+      return BigInt(bal.value.amount);
+    } catch {
+      // The associated token account doesn't exist yet → zero balance.
+      return 0n;
+    }
+  }
+
   async getConfirmations(signature: string): Promise<number> {
     const res = await this.connection.getSignatureStatuses([signature], {
       searchTransactionHistory: true,
@@ -138,14 +155,28 @@ export class Web3SolanaProvider implements SolanaProvider {
       );
       const idx = keys.indexOf(address);
       if (idx >= 0 && tx.meta.preBalances && tx.meta.postBalances) {
-        const delta =
-          BigInt(tx.meta.postBalances[idx] ?? 0) -
-          BigInt(tx.meta.preBalances[idx] ?? 0);
+        const preB = tx.meta.preBalances;
+        const postB = tx.meta.postBalances;
+        const delta = BigInt(postB[idx] ?? 0) - BigInt(preB[idx] ?? 0);
         if (delta > 0n) {
+          // Attribute to the VALUE SOURCE — the account that paid the most out,
+          // which matches the deposit — NOT the fee payer (accountKeys[0]). For
+          // exchange withdrawals / relayers the fee payer is not the user's
+          // wallet, so fee-payer attribution silently drops those deposits.
+          let senderIdx = -1;
+          let maxOut = 0n;
+          for (let j = 0; j < keys.length; j++) {
+            if (j === idx) continue;
+            const out = BigInt(preB[j] ?? 0) - BigInt(postB[j] ?? 0);
+            if (out > maxOut) {
+              maxOut = out;
+              senderIdx = j;
+            }
+          }
           transfers.push({
             txSignature: info.signature,
             toAddress: address,
-            fromAddress: keys[0] ?? null,
+            fromAddress: senderIdx >= 0 ? keys[senderIdx]! : keys[0] ?? null,
             asset: "SOL",
             amount: delta,
             confirmations,
@@ -167,10 +198,26 @@ export class Web3SolanaProvider implements SolanaProvider {
         const afterAmt = BigInt(p.uiTokenAmount.amount ?? "0");
         const delta = afterAmt - beforeAmt;
         if (delta > 0n) {
+          // Source = the token account of the same mint whose balance dropped;
+          // its `owner` is the sender's wallet. Falls back to the fee payer only
+          // when no source can be identified (e.g. the source account closed).
+          let sourceOwner: string | null = null;
+          let maxDrop = 0n;
+          for (const s of post) {
+            if (s.mint !== p.mint || s.owner === address) continue;
+            const sBefore = pre.find((x) => x.accountIndex === s.accountIndex);
+            const drop =
+              BigInt(sBefore?.uiTokenAmount.amount ?? "0") -
+              BigInt(s.uiTokenAmount.amount ?? "0");
+            if (drop > maxDrop) {
+              maxDrop = drop;
+              sourceOwner = s.owner ?? null;
+            }
+          }
           transfers.push({
             txSignature: info.signature,
             toAddress: address,
-            fromAddress: keys[0] ?? null,
+            fromAddress: sourceOwner ?? keys[0] ?? null,
             asset,
             amount: delta,
             confirmations,

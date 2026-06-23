@@ -106,6 +106,10 @@ enum DepositStatus {
   CONFIRMED
   CREDITED
   FAILED
+  // Funds arrived in the treasury but the sender wallet maps to no user (e.g. an
+  // exchange withdrawal). Recorded for manual admin attribution, never credited
+  // automatically.
+  UNATTRIBUTED
 }
 
 enum WithdrawalStatus {
@@ -320,7 +324,9 @@ model LedgerEntry {
 
 model Deposit {
   id            String        @id @default(cuid())
-  userId        String
+  // Null only for UNATTRIBUTED deposits (sender maps to no user) awaiting manual
+  // attribution; set once an admin assigns the deposit to a user.
+  userId        String?
   asset         Asset
   chain         Chain         @default(SOLANA)
   fromAddress   String?
@@ -332,7 +338,7 @@ model Deposit {
   createdAt     DateTime      @default(now())
   creditedAt    DateTime?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])

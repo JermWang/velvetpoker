@@ -18,7 +18,17 @@ async function load() {
 export default async function AdminDepositsPage() {
   const rows = await load();
   const columns: Column<Row>[] = [
-    { header: "User", cell: (d) => <span className="text-ivory">{d.user.email ?? d.userId}</span> },
+    {
+      header: "User",
+      cell: (d) =>
+        d.userId ? (
+          <span className="text-ivory">{d.user?.email ?? d.userId}</span>
+        ) : (
+          <span className="text-amber-300" title={d.fromAddress ?? undefined}>
+            Unattributed
+          </span>
+        ),
+    },
     {
       header: "Amount",
       align: "right",

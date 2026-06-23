@@ -436,6 +436,28 @@ export async function adminAdjust(
 // Reconciliation: cached Balance must equal the ledger projection.
 // ---------------------------------------------------------------------------
 
+/**
+ * The amount of `asset` that SHOULD be sitting in the treasury/hot wallet on
+ * chain, per the ledger: deposits flowed in (TREASURY_CASH DEBIT) and sent
+ * withdrawals flowed out (TREASURY_CASH CREDIT), so expected = debits − credits.
+ * Equivalently it equals the sum of every outstanding custodial liability (user
+ * balances + pending withdrawals + house revenue) by the double-entry identity.
+ */
+export async function treasuryExpectedOnChain(asset: Asset): Promise<bigint> {
+  const grouped = await prisma.ledgerEntry.groupBy({
+    by: ["direction"],
+    where: { asset, accountType: "TREASURY_CASH" },
+    _sum: { amount: true },
+  });
+  let debits = 0n;
+  let credits = 0n;
+  for (const g of grouped) {
+    if (g.direction === "DEBIT") debits += g._sum.amount ?? 0n;
+    else credits += g._sum.amount ?? 0n;
+  }
+  return debits - credits;
+}
+
 export async function reconcileUserBalance(
   userId: string,
   asset: Asset,

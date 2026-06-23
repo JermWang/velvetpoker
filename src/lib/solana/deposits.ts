@@ -11,7 +11,84 @@ import type { Asset } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { env } from "@/lib/env";
 import { creditDeposit } from "@/lib/ledger/ledger";
+import { recordRiskEvent } from "@/lib/risk/risk-events";
 import { getSolanaProvider } from "./connection";
+import type { IncomingTransfer } from "./provider";
+
+/**
+ * Record a treasury transfer whose sender maps to no user (e.g. an exchange
+ * withdrawal, where the on-chain sender is the exchange, not the player). It is
+ * persisted once (idempotent on txSignature) as an UNATTRIBUTED deposit and
+ * raised as a HIGH risk event so an admin can attribute it — never silently
+ * dropped. Recording it also advances the deposit-scan cursor past it.
+ */
+async function recordUnattributedDeposit(t: IncomingTransfer): Promise<void> {
+  const existing = await prisma.deposit.findUnique({
+    where: { txSignature: t.txSignature },
+  });
+  if (existing) return; // already recorded — no duplicate, no repeat alert
+  try {
+    await prisma.deposit.create({
+      data: {
+        userId: null,
+        asset: t.asset,
+        chain: "SOLANA",
+        fromAddress: t.fromAddress,
+        toAddress: t.toAddress,
+        txSignature: t.txSignature,
+        amount: t.amount,
+        confirmations: t.confirmations,
+        status: "UNATTRIBUTED",
+      },
+    });
+  } catch {
+    // A concurrent poll already inserted it (unique txSignature) — fine.
+    return;
+  }
+  await recordRiskEvent({
+    type: "ADMIN_ACTION",
+    severity: "HIGH",
+    metadata: {
+      kind: "unattributed_deposit",
+      txSignature: t.txSignature,
+      asset: t.asset,
+      amount: t.amount.toString(),
+      fromAddress: t.fromAddress,
+    },
+  });
+}
+
+/**
+ * Admin action: attribute a previously UNATTRIBUTED deposit to a user and credit
+ * it (idempotent). Use after manually confirming the off-chain sender (e.g. an
+ * exchange withdrawal) belongs to that user.
+ */
+export async function assignUnattributedDeposit(params: {
+  depositId: string;
+  userId: string;
+}): Promise<{ credited: boolean }> {
+  const deposit = await prisma.deposit.findUnique({
+    where: { id: params.depositId },
+  });
+  if (!deposit) throw new Error("Deposit not found");
+  if (deposit.status === "CREDITED") return { credited: false };
+  if (deposit.userId && deposit.userId !== params.userId) {
+    throw new Error("Deposit is already attributed to another user");
+  }
+  // Re-check confirmations live so a long-pending deposit credits immediately.
+  const confirmations = await getSolanaProvider().getConfirmations(
+    deposit.txSignature,
+  );
+  return ingestTransfer({
+    userId: params.userId,
+    asset: deposit.asset,
+    toAddress: deposit.toAddress,
+    fromAddress: deposit.fromAddress,
+    txSignature: deposit.txSignature,
+    amount: deposit.amount,
+    confirmations,
+  });
+}
 
 /**
  * Process a single observed transfer. Idempotent on txSignature: if a Deposit
@@ -43,6 +120,9 @@ export async function ingestTransfer(params: {
       ? await tx.deposit.update({
           where: { txSignature: params.txSignature },
           data: {
+            // Attribute (or re-attribute) to the resolved user — this is how an
+            // UNATTRIBUTED row becomes owned when an admin assigns it.
+            userId: params.userId,
             confirmations: params.confirmations,
             status: confirmed ? "CONFIRMED" : "DETECTED",
           },
@@ -63,10 +143,11 @@ export async function ingestTransfer(params: {
 
     if (!confirmed) return { credited: false };
 
-    // Credit the ledger and flip to CREDITED within the same transaction.
+    // Credit the ledger and flip to CREDITED within the same transaction. Use
+    // the resolved userId param (deposit.userId is nullable in the schema).
     await creditDeposit(
       {
-        userId: deposit.userId,
+        userId: params.userId,
         asset: deposit.asset,
         amount: deposit.amount,
         correlationId: `deposit:${deposit.txSignature}`,
@@ -99,6 +180,9 @@ export async function recheckPendingDeposits(): Promise<{ credited: number }> {
 
   let credited = 0;
   for (const d of pending) {
+    // DETECTED/CONFIRMED deposits are always attributed; skip any without a user
+    // (would be an UNATTRIBUTED row, which this query excludes) to satisfy types.
+    if (!d.userId) continue;
     const confirmations = await provider.getConfirmations(d.txSignature);
     if (confirmations <= 0) continue;
     const res = await ingestTransfer({
@@ -147,15 +231,16 @@ export async function scanTreasuryDeposits(): Promise<{ credited: number; unattr
   let unattributed = 0;
 
   for (const t of transfers) {
-    if (!t.fromAddress) {
-      unattributed++;
-      continue;
-    }
-    const wallet = await prisma.wallet.findUnique({
-      where: { chain_address: { chain: "SOLANA", address: t.fromAddress } },
-    });
+    const wallet = t.fromAddress
+      ? await prisma.wallet.findUnique({
+          where: { chain_address: { chain: "SOLANA", address: t.fromAddress } },
+        })
+      : null;
     if (!wallet?.userId) {
+      // Sender maps to no linked wallet — record for manual attribution instead
+      // of dropping it (the funds are really in the treasury).
       unattributed++;
+      await recordUnattributedDeposit(t);
       continue;
     }
     const res = await ingestTransfer({

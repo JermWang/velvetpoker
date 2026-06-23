@@ -29,6 +29,12 @@ export class MockSolanaProvider implements SolanaProvider {
     return this.confirmations.get(signature) ?? 0;
   }
 
+  async getOnChainBalance(_address: string, _asset: Asset): Promise<bigint> {
+    // The mock holds no real chain balance; treasury reconciliation is gated to
+    // the real provider, so this is only ever a placeholder in dev/tests.
+    return 0n;
+  }
+
   async getIncomingTransfers(
     address: string,
     _untilSignature?: string,

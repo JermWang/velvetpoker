@@ -85,6 +85,14 @@ export const env = {
   // generic JSON). Unset = alerts are recorded to the DB only.
   alertWebhookUrl: optional("ALERT_WEBHOOK_URL"),
   depositConfirmations: Number(optional("DEPOSIT_CONFIRMATIONS") ?? "32"),
+  // Tolerance for the on-chain treasury reconciliation. A SHORTFALL beyond this
+  // (chain balance < ledger liabilities) fires a CRITICAL alert. SOL needs a
+  // buffer because tx fees + ATA rent drain lamports that the ledger doesn't
+  // track; SPL (USDC/TOKEN) has no such drift so its tolerance is ~0.
+  reconcileToleranceLamports: BigInt(
+    optional("RECONCILE_TOLERANCE_LAMPORTS") ?? "100000000", // 0.1 SOL
+  ),
+  reconcileToleranceSpl: BigInt(optional("RECONCILE_TOLERANCE_SPL") ?? "0"),
   // Cap on concurrent private tables (server-overload guard). Hosting is blocked
   // with a "wait" message once this many private games are live.
   maxPrivateTables: Number(optional("MAX_PRIVATE_TABLES") ?? "50"),

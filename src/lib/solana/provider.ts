@@ -27,6 +27,12 @@ export interface SolanaProvider {
   /** Confirmations for a given signature (0 if unknown / dropped). */
   getConfirmations(signature: string): Promise<number>;
   /**
+   * Current on-chain balance of an address for an asset, in base units (lamports
+   * for SOL, token base units for SPL). Returns 0 if the token account does not
+   * exist. Used to reconcile custodial liabilities against real chain holdings.
+   */
+  getOnChainBalance(address: string, asset: Asset): Promise<bigint>;
+  /**
    * Incoming transfers to a watched address. Pages through ALL signatures newer
    * than `untilSignature` (an RPC-side cursor — the last signature already
    * processed), so no transfer is missed under load. Omit the cursor to scan the
