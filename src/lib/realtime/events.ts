@@ -31,6 +31,9 @@ export type ClientEvent =
     }
   | { t: "SUBMIT_CLIENT_SEED"; tableId: string; seed: string }
   | { t: "SEND_CHAT"; tableId: string; message: string }
+  // Optionally reveal your hole cards after winning a pot uncontested (no one
+  // called). Honored only for the most recent uncontested winner.
+  | { t: "SHOW_CARDS"; tableId: string }
   | { t: "REQUEST_TABLE_STATE"; tableId: string };
 
 // ---- Server -> Client ------------------------------------------------------
@@ -132,6 +135,15 @@ export type ServerEvent =
       locked: string;
     }
   | { t: "CHAT"; tableId: string; from: string; message: string; at: number }
+  // A player voluntarily revealed their hole cards after an uncontested win.
+  | {
+      t: "SHOWN_CARDS";
+      tableId: string;
+      seat: number;
+      playerId: string;
+      displayName: string;
+      cards: Card[];
+    }
   | { t: "ERROR"; message: string; code?: string };
 
 export function encode(event: ServerEvent): string {

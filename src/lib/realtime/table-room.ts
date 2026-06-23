@@ -135,6 +135,9 @@ export class TableRoom {
   // Demo/free-play only: brief window to reconnect (e.g. a page refresh) before a
   // disconnected seat is freed, so an accidental refresh drops you back in.
   private disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // The most recent uncontested winner (everyone folded). They may OPTIONALLY
+  // reveal their hand via showCards() until the next hand starts. Null otherwise.
+  private lastUncontestedWinner: { playerId: string; seat: number; cards: Card[] } | null = null;
   private hand: HandState | null = null;
   private handNumber = 0;
   private dealerSeat = 0;
@@ -593,6 +596,8 @@ export class TableRoom {
     this.lastActionBySeat.clear();
     this.lastStreet = "PREFLOP";
     this.lastCommunityCount = 0;
+    // The previous hand's optional-show window closes when a new hand begins.
+    this.lastUncontestedWinner = null;
 
     // Rotate the button to the next eligible seat.
     this.dealerSeat = this.nextDealerSeat(players);
@@ -816,6 +821,24 @@ export class TableRoom {
     }
   }
 
+  /**
+   * Optional show: the most recent uncontested winner voluntarily reveals their
+   * hand to the table. One-time, and only the winner can trigger it.
+   */
+  showCards(playerId: string): void {
+    const w = this.lastUncontestedWinner;
+    if (!w || w.playerId !== playerId) return;
+    this.lastUncontestedWinner = null; // one-time reveal
+    this.broadcast({
+      t: "SHOWN_CARDS",
+      tableId: this.config.tableId,
+      seat: w.seat,
+      playerId: this.tokenFor(w.playerId),
+      displayName: this.findSeatByPlayer(w.playerId)?.displayName ?? "Player",
+      cards: w.cards,
+    });
+  }
+
   private onActionTimeout(playerId: string): void {
     if (!this.hand) return;
     const seat = this.hand.seats.find((s) => s.playerId === playerId);
@@ -854,6 +877,20 @@ export class TableRoom {
           cards: contested && !r.hasFolded ? r.cards : [],
         })),
       });
+
+      // Uncontested win (everyone folded): the winner mucked unseen, but may
+      // OPTIONALLY reveal their hand (SHOW_CARDS) until the next hand starts.
+      this.lastUncontestedWinner = null;
+      if (!contested) {
+        const winner = hand.seats.find((s) => s.inHand && !s.hasFolded);
+        if (winner && !isBotId(winner.playerId)) {
+          this.lastUncontestedWinner = {
+            playerId: winner.playerId,
+            seat: winner.seat,
+            cards: winner.holeCards,
+          };
+        }
+      }
     }
 
     // Reveal server seed so anyone can verify the deck.

@@ -19,6 +19,8 @@ export interface TableSocketState {
   lastShowdown: Extract<ServerEvent, { t: "SHOWDOWN" }> | null;
   /** Recent completed hands at this table (newest last), for the in-game feed. */
   handHistory: HandHistoryEntry[];
+  /** Cards voluntarily revealed after an uncontested win, by seat (this hand). */
+  shownCards: Record<number, Card[]>;
   error: string | null;
 }
 
@@ -64,6 +66,7 @@ export function useTableSocket({
     chat: [],
     lastShowdown: null,
     handHistory: [],
+    shownCards: {},
     error: null,
   });
 
@@ -165,7 +168,9 @@ function reduce(s: TableSocketState, e: ServerEvent): TableSocketState {
     case "PRIVATE_CARDS":
       return { ...s, holeCards: e.cards };
     case "HAND_STARTED":
-      return { ...s, holeCards: null, lastShowdown: null };
+      return { ...s, holeCards: null, lastShowdown: null, shownCards: {} };
+    case "SHOWN_CARDS":
+      return { ...s, shownCards: { ...s.shownCards, [e.seat]: e.cards } };
     case "ACTION_REQUIRED":
       return {
         ...s,

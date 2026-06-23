@@ -120,6 +120,9 @@ export function PokerTableView(props: PokerTableViewProps) {
   });
   const [chatInput, setChatInput] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
+  // Track an uncontested-win hand the player chose to keep hidden, so the
+  // optional show/muck prompt doesn't reappear after they decline.
+  const [hidShowHand, setHidShowHand] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   // Chat is collapsed by default. Auto-open it whenever a message is sent or
   // received so messages are never silently invisible (which reads as "chat is
@@ -283,6 +286,22 @@ export function PokerTableView(props: PokerTableViewProps) {
     }
     return m;
   }, [state.lastShowdown]);
+
+  // You won a pot UNCONTESTED (everyone folded → your result has winnings but no
+  // revealed cards): offer to optionally show or keep your hand hidden, until you
+  // decide or the next hand starts.
+  const myShowdownResult =
+    yourSeat != null
+      ? state.lastShowdown?.results.find((r) => r.seat === yourSeat.seat)
+      : undefined;
+  const canOfferShow =
+    yourSeat != null &&
+    state.lastShowdown != null &&
+    myShowdownResult != null &&
+    BigInt(myShowdownResult.amountWon) > 0n &&
+    myShowdownResult.cards.length === 0 &&
+    state.shownCards[yourSeat.seat] === undefined &&
+    hidShowHand !== state.lastShowdown.handId;
 
   // The whole table fits one screen: a fixed-height flex column (viewport minus
   // the app header + page padding ≈ 8rem) where the felt absorbs the slack and
@@ -620,7 +639,11 @@ export function PokerTableView(props: PokerTableViewProps) {
                         : null
                     }
                     clock={table.toActSeat === s.seat ? clock : null}
-                    revealCards={showdownBySeat.get(s.seat)?.cards ?? null}
+                    revealCards={
+                      showdownBySeat.get(s.seat)?.cards ??
+                      state.shownCards[s.seat] ??
+                      null
+                    }
                     handLabel={showdownBySeat.get(s.seat)?.handDescription ?? null}
                     show3d={showdownBySeat.size > 0}
                     isWinner={winAmt != null}
@@ -727,6 +750,26 @@ export function PokerTableView(props: PokerTableViewProps) {
             <Button size="sm" className="mt-2" onClick={rebuyToMax}>
               {props.demo ? "Get more free chips" : "Rebuy"}
             </Button>
+          </div>
+        ) : canOfferShow ? (
+          <div className="rounded-2xl border border-velvet/30 bg-velvet/[0.06] p-3 text-center">
+            <p className="text-sm text-ivory">You won — show your hand?</p>
+            <p className="mt-0.5 text-xs text-ash">Optional. Nobody called you.</p>
+            <div className="mt-2 flex justify-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => send({ t: "SHOW_CARDS", tableId: props.tableId })}
+              >
+                Show
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setHidShowHand(state.lastShowdown!.handId)}
+              >
+                Keep hidden
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="rounded-2xl border border-white/10 bg-charcoal-800/70 p-3.5 shadow-elevated">

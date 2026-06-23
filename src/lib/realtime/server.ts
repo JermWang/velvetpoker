@@ -424,6 +424,11 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
     case "SUBMIT_CLIENT_SEED":
       room.submitClientSeed(userId, event.seed);
       break;
+    case "SHOW_CARDS":
+      // Optional reveal after an uncontested win (no-op unless the caller is the
+      // most recent uncontested winner).
+      room.showCards(userId);
+      break;
     case "LEAVE_TABLE": {
       // You can't pick chips up out of a live pot. Make the player finish the
       // current hand before leaving — this also prevents a cash-out of the
