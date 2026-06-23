@@ -108,6 +108,19 @@ export function PokerTableView(props: PokerTableViewProps) {
   });
   const [chatInput, setChatInput] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
+  // Chat is collapsed by default. Auto-open it whenever a message is sent or
+  // received so messages are never silently invisible (which reads as "chat is
+  // broken"), and keep the history scrolled to the newest line.
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const prevChatLen = useRef(0);
+  useEffect(() => {
+    if (state.chat.length > prevChatLen.current) setChatOpen(true);
+    prevChatLen.current = state.chat.length;
+  }, [state.chat.length]);
+  useEffect(() => {
+    const el = chatScrollRef.current;
+    if (chatOpen && el) el.scrollTop = el.scrollHeight;
+  }, [chatOpen, state.chat.length]);
   // Pre-action ("act ahead of turn") — applied automatically when it's our turn.
   const [preAction, setPreAction] = useState<
     null | "fold" | "checkfold" | "check" | "callany"
@@ -759,7 +772,10 @@ export function PokerTableView(props: PokerTableViewProps) {
       {/* Chat — a single compact row; history floats above when opened */}
       <div className="relative shrink-0">
         {chatOpen && (
-          <div className="absolute bottom-full mb-2 max-h-40 w-full space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-charcoal-900/95 p-3 text-sm shadow-elevated backdrop-blur">
+          <div
+            ref={chatScrollRef}
+            className="absolute bottom-full mb-2 max-h-40 w-full space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-charcoal-900/95 p-3 text-sm shadow-elevated backdrop-blur"
+          >
             {state.chat.length === 0 ? (
               <p className="text-xs text-ash/60">No messages yet.</p>
             ) : (
@@ -782,6 +798,7 @@ export function PokerTableView(props: PokerTableViewProps) {
               if (!chatInput.trim()) return;
               send({ t: "SEND_CHAT", tableId: props.tableId, message: chatInput });
               setChatInput("");
+              setChatOpen(true);
             }}
             className="flex items-center gap-2"
           >
