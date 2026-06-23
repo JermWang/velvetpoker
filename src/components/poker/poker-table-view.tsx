@@ -68,11 +68,23 @@ function Chip({ size = 20 }: { size?: number }) {
 export function PokerTableView(props: PokerTableViewProps) {
   // Guests get a stable ephemeral id for the session; it's the playerId the ws
   // seats them under (demo tables only) and what we match "your seat" against.
-  const [guestId] = useState<string | null>(() =>
-    props.guestMode
-      ? `g${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`
-      : null,
-  );
+  const [guestId] = useState<string | null>(() => {
+    if (!props.guestMode) return null;
+    const fresh = () =>
+      `g${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`;
+    if (typeof window === "undefined") return fresh();
+    // Persist the guest identity for the tab session so an accidental refresh
+    // reconnects to the SAME free-play seat/hand instead of a brand-new identity.
+    try {
+      const existing = window.sessionStorage.getItem("velvet-guest-id");
+      if (existing) return existing;
+      const id = fresh();
+      window.sessionStorage.setItem("velvet-guest-id", id);
+      return id;
+    } catch {
+      return fresh();
+    }
+  });
   const authQuery =
     props.guestMode && guestId ? `guest=${guestId}` : props.authQuery;
 
@@ -776,7 +788,7 @@ export function PokerTableView(props: PokerTableViewProps) {
       {/* Chat + hand history — a single compact row; panels float above when opened */}
       <div className="relative shrink-0">
         {historyOpen && (
-          <div className="absolute bottom-full mb-2 max-h-48 w-full space-y-1.5 overflow-y-auto rounded-xl border border-white/10 bg-charcoal-900/95 p-3 text-sm shadow-elevated backdrop-blur">
+          <div className="absolute top-full z-20 mt-2 max-h-[min(14rem,40dvh)] w-full space-y-1.5 overflow-y-auto rounded-xl border border-white/10 bg-charcoal-900/95 p-3 text-sm shadow-elevated backdrop-blur">
             <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ash">
               Recent hands
             </p>
@@ -811,7 +823,7 @@ export function PokerTableView(props: PokerTableViewProps) {
         {chatOpen && (
           <div
             ref={chatScrollRef}
-            className="absolute bottom-full mb-2 max-h-40 w-full space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-charcoal-900/95 p-3 text-sm shadow-elevated backdrop-blur"
+            className="absolute top-full z-20 mt-2 max-h-[min(12rem,38dvh)] w-full space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-charcoal-900/95 p-3 text-sm shadow-elevated backdrop-blur"
           >
             {state.chat.length === 0 ? (
               <p className="text-xs text-ash/60">No messages yet.</p>

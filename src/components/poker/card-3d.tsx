@@ -167,9 +167,11 @@ export function Card3D({
               backfaceVisibility: "hidden",
               transform: `rotateY(180deg) translateZ(${half}px)`,
               overflow: "hidden",
-              background: "#13151a",
+              // Cream base + velvet-red border (was near-black, hard to see on felt).
+              background:
+                "radial-gradient(125% 120% at 50% -8%, #faf8f1 0%, #f2eee2 70%, #e9e3d3 100%)",
               boxShadow:
-                "inset 0 0 0 1px rgba(143,29,44,0.4), inset 0 0 0 4px rgba(15,17,21,1), inset 0 0 0 5px rgba(143,29,44,0.22)",
+                "inset 0 0 0 1px rgba(143,29,44,0.6), inset 0 0 0 4px rgba(250,248,241,1), inset 0 0 0 5px rgba(143,29,44,0.32)",
             }}
           >
             <div
@@ -177,7 +179,7 @@ export function Card3D({
                 position: "absolute",
                 inset: 0,
                 background:
-                  "repeating-linear-gradient(45deg, rgba(143,29,44,0.18) 0 1px, transparent 1px 8px), repeating-linear-gradient(-45deg, rgba(143,29,44,0.18) 0 1px, transparent 1px 8px)",
+                  "repeating-linear-gradient(45deg, rgba(143,29,44,0.3) 0 1.5px, transparent 1.5px 8px), repeating-linear-gradient(-45deg, rgba(143,29,44,0.3) 0 1.5px, transparent 1.5px 8px)",
               }}
             />
             <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>
@@ -190,7 +192,7 @@ export function Card3D({
                   borderRadius: Math.round(S.crest * 0.22),
                   border: "1px solid rgba(143,29,44,0.55)",
                   background: "rgba(143,29,44,0.09)",
-                  boxShadow: "0 0 0 4px rgba(19,21,26,0.85), 0 0 0 5px rgba(143,29,44,0.25)",
+                  boxShadow: "0 0 0 4px rgba(250,248,241,0.85), 0 0 0 5px rgba(143,29,44,0.3)",
                   fontFamily: "var(--font-display), Georgia, serif",
                   color: "#b03a48",
                   fontSize: S.crestF,

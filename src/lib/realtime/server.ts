@@ -620,22 +620,25 @@ export function startServer(
     ws.on("message", (data) => accept(String(data)));
     for (const raw of early) accept(raw);
     ws.on("close", () => {
-      if (client.tableId) {
-        const entry = rooms.get(client.tableId);
-        if (entry) {
-          if (client.userId) {
-            // Free-play seats are ephemeral (guests use a fresh id each visit),
-            // so vacate them on disconnect — otherwise dead seats pile up and
-            // fill the table. Real-money seats stay (marked offline) so the
-            // player can reconnect; their funds remain locked until they leave.
-            if (client.isGuest || entry.isDemo) {
-              entry.room.leave(client.userId);
-            } else {
-              entry.room.setConnected(client.userId, false);
-            }
-          }
-          entry.clients.delete(client);
-        }
+      if (!client.tableId) return;
+      const entry = rooms.get(client.tableId);
+      if (!entry) return;
+      entry.clients.delete(client);
+      if (!client.userId) return;
+      // A fast refresh can open the new socket BEFORE this one closes — if the
+      // user still has another live socket here, they never actually left.
+      const stillHere = [...entry.clients].some(
+        (c) => c.userId === client.userId,
+      );
+      if (stillHere) return;
+      if (client.isGuest || entry.isDemo) {
+        // Free play: keep the seat briefly so an accidental refresh reconnects
+        // into the same hand; freed automatically if they don't return.
+        entry.room.markDisconnected(client.userId);
+      } else {
+        // Real-money seats stay (marked offline) so the player can reconnect;
+        // their funds remain locked until they leave.
+        entry.room.setConnected(client.userId, false);
       }
     });
   });

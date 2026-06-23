@@ -38,9 +38,12 @@ export function PlayingCard({
           width: S.w,
           height: S.h,
           borderRadius: S.r,
-          background: "#13151a",
+          // Cream base with a velvet-red border so face-down cards read clearly
+          // against the dark felt (the old near-black back was hard to see).
+          background:
+            "radial-gradient(125% 120% at 50% -8%, #faf8f1 0%, #f2eee2 70%, #e9e3d3 100%)",
           boxShadow:
-            "inset 0 0 0 1px rgba(143,29,44,0.36), inset 0 0 0 3px rgba(15,17,21,1), inset 0 0 0 4px rgba(143,29,44,0.2)",
+            "inset 0 0 0 1px rgba(143,29,44,0.6), inset 0 0 0 3px rgba(250,248,241,1), inset 0 0 0 4px rgba(143,29,44,0.32)",
         }}
       >
         <div
@@ -48,8 +51,9 @@ export function PlayingCard({
             width: "100%",
             height: "100%",
             borderRadius: S.r,
+            // Red lattice on cream — a classic card back.
             background:
-              "repeating-linear-gradient(45deg, rgba(143,29,44,0.16) 0 1px, transparent 1px 7px), repeating-linear-gradient(-45deg, rgba(143,29,44,0.16) 0 1px, transparent 1px 7px)",
+              "repeating-linear-gradient(45deg, rgba(143,29,44,0.3) 0 1.5px, transparent 1.5px 7px), repeating-linear-gradient(-45deg, rgba(143,29,44,0.3) 0 1.5px, transparent 1.5px 7px)",
           }}
         />
       </div>

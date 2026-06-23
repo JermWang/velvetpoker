@@ -132,6 +132,9 @@ export class TableRoom {
   // On bust, a player keeps their seat for a short window to buy back in before
   // it's freed (keyed by playerId).
   private bustTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // Demo/free-play only: brief window to reconnect (e.g. a page refresh) before a
+  // disconnected seat is freed, so an accidental refresh drops you back in.
+  private disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private hand: HandState | null = null;
   private handNumber = 0;
   private dealerSeat = 0;
@@ -312,6 +315,11 @@ export class TableRoom {
 
   leave(playerId: string): bigint {
     this.cancelBustGrace(playerId);
+    const dt = this.disconnectTimers.get(playerId);
+    if (dt) {
+      clearTimeout(dt);
+      this.disconnectTimers.delete(playerId);
+    }
     const seat = this.findSeatByPlayer(playerId);
     if (!seat) return 0n;
     // A player in an active hand is marked sitting out and removed after the
@@ -332,7 +340,35 @@ export class TableRoom {
 
   setConnected(playerId: string, connected: boolean): void {
     const seat = this.findSeatByPlayer(playerId);
-    if (seat) seat.connected = connected;
+    if (!seat) return;
+    seat.connected = connected;
+    if (connected) {
+      // Reconnected (e.g. a refresh) — cancel any pending disconnect cleanup and
+      // resume play if the table now has enough active players.
+      const dt = this.disconnectTimers.get(playerId);
+      if (dt) {
+        clearTimeout(dt);
+        this.disconnectTimers.delete(playerId);
+      }
+    }
+    this.broadcastSeats();
+    if (connected) this.maybeStartHand();
+  }
+
+  /**
+   * Demo/free-play: a player's socket dropped. Keep their seat for a short grace
+   * so an accidental refresh reconnects them into their hand uninterrupted; free
+   * the seat only if they don't come back within the window.
+   */
+  markDisconnected(playerId: string): void {
+    this.setConnected(playerId, false);
+    if (this.disconnectTimers.has(playerId)) return;
+    const t = setTimeout(() => {
+      this.disconnectTimers.delete(playerId);
+      const seat = this.findSeatByPlayer(playerId);
+      if (seat && !seat.connected) this.leave(playerId);
+    }, TableRoom.DISCONNECT_GRACE_MS);
+    this.disconnectTimers.set(playerId, t);
   }
 
   /** Current table stack for a seated player (0 if not seated). */
@@ -368,6 +404,8 @@ export class TableRoom {
   private static readonly DEMO_TARGET_PLAYERS = 5;
   /** Wait this long for real opponents before filling a demo table with bots. */
   private static readonly BOT_FILL_DELAY_MS = 30_000;
+  /** Grace for a disconnected demo seat to reconnect (refresh) before it frees. */
+  private static readonly DISCONNECT_GRACE_MS = 45_000;
 
   private isBotSeat(s: RoomSeat): boolean {
     return isBotId(s.playerId);
@@ -885,12 +923,19 @@ export class TableRoom {
       const finalStack = es.stack - rakeShare;
       deltas.push({ playerId: es.playerId, net: finalStack - startStack });
       roomSeat.stack = finalStack;
-      // Bust-out: sit them out but KEEP the seat so they can rebuy at will (free
-      // play OR wagered, public OR private). There's no time limit — the seat is
-      // only reclaimed if a NEW player needs it and the table is full (see
-      // evictOneBustedSeat). No queue waiting → keep your seat and rebuy.
+      // Bust-out handling:
+      //  - Bots just leave when they run out (fresh bots refill empty seats).
+      //  - Humans KEEP their seat (sitting out) so they can rebuy at will (free
+      //    play OR wagered, public OR private), with no time limit. The seat is
+      //    only reclaimed if a NEW player needs it and the table is full (see
+      //    evictOneBustedSeat). No queue waiting → keep your seat and rebuy.
       if (roomSeat.stack === 0n) {
-        roomSeat.sittingOut = true;
+        if (this.isBotSeat(roomSeat)) {
+          this.seats.delete(roomSeat.seatNumber);
+          this.seatTokens.delete(roomSeat.playerId);
+        } else {
+          roomSeat.sittingOut = true;
+        }
       }
     }
 

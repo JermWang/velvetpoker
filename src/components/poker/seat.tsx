@@ -172,8 +172,8 @@ export function Seat({
             isToAct
               ? {
                   boxShadow: urgent
-                    ? "0 0 0 2px #f87171, 0 0 22px rgba(248,113,113,0.5)"
-                    : "0 0 0 2px #b03a48, 0 0 22px rgba(143,29,44,0.55)",
+                    ? "0 0 0 2px #f87171, 0 0 13px rgba(248,113,113,0.45)"
+                    : "0 0 0 2px #b03a48, 0 0 13px rgba(143,29,44,0.5)",
                 }
               : undefined
           }
@@ -191,16 +191,19 @@ export function Seat({
           )}
         </div>
         {isDealer && (
-          <span className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-ivory text-[10px] font-bold text-charcoal-900 ring-2 ring-charcoal-900">
+          // Dealer button sits to the right of the avatar (vertically centered)
+          // so it never covers the name/stack pill below it.
+          <span className="absolute top-1/2 -right-2.5 -translate-y-1/2 grid h-5 w-5 place-items-center rounded-full bg-ivory text-[10px] font-bold text-charcoal-900 ring-2 ring-charcoal-900">
             D
           </span>
         )}
       </div>
 
-      {/* Name + stack pill */}
+      {/* Name + stack pill — sits clearly BELOW the avatar (and its to-act ring/
+          glow) so the player's name and stack are never covered. */}
       <div
         className={cn(
-          "-mt-1.5 min-w-[3.75rem] max-w-[7rem] rounded-full px-2.5 py-0.5 text-center shadow-sm",
+          "mt-1.5 min-w-[3.75rem] max-w-[7rem] rounded-full px-2.5 py-0.5 text-center shadow-sm",
           isToAct ? "bg-velvet/40" : "bg-charcoal-900/85",
         )}
         style={{ border: "1px solid rgba(255,255,255,0.08)" }}
