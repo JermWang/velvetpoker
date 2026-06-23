@@ -410,7 +410,7 @@ export function PokerTableView(props: PokerTableViewProps) {
       >
         {/* Keep the Claude-design aspect (1180×560) so the oval stays proportional;
             grow it as large as the viewport height allows. */}
-        <div className="relative h-full w-full sm:aspect-[1140/600] sm:h-auto sm:max-h-full sm:max-w-5xl">
+        <div className="relative h-full w-full sm:aspect-[960/620] sm:mx-auto sm:h-auto sm:max-h-full sm:max-w-4xl">
           {/* Rail + felt surface — insets match the prototype (18px / 96px on
               1180×560 ≈ 3.2% vertical, 8.1% horizontal). */}
           <div className="pointer-events-none absolute" style={{ inset: "3.2% 8.1%" }}>
@@ -801,7 +801,7 @@ function seatPosition(
   // rx leaves room for the ~100px-wide seat clusters at the sides; ry is kept
   // modest and the ring sits a touch low so the TOP-row seats keep their cards
   // clear of the felt edge (with the felt's top padding adding more headroom).
-  return { x: 50 + 43 * Math.cos(angle), y: 50 + 30 * Math.sin(angle) };
+  return { x: 50 + 40 * Math.cos(angle), y: 50 + 31 * Math.sin(angle) };
 }
 
 /**
