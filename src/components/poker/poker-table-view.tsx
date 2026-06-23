@@ -237,10 +237,11 @@ export function PokerTableView(props: PokerTableViewProps) {
   // Demo tables use free chips; real tables are labeled by their asset symbol.
   const unit = props.demo ? "chips" : ASSET_SYMBOLS[props.asset];
 
-  // Oval-table layout: every seat is placed on an ellipse, rotated so your own
-  // seat sits at the bottom-center and opponents fan out around the rim.
+  // Oval-table layout: every seat is placed on an ellipse at a FIXED position
+  // (seat 0 bottom-center, increasing clockwise). No hero rotation — you stay
+  // seated exactly where you clicked, and the seating is consistent for everyone.
   const seatCount = table?.seats.length ?? 0;
-  const heroSlotAnchor = yourSeat?.seat ?? 0;
+  const heroSlotAnchor = 0;
 
   // Showdown reveals: map each shown seat -> its hole cards + hand rank. Server
   // only sends cards for a contested showdown, so uncontested wins reveal none.
