@@ -400,10 +400,12 @@ export function PokerTableView(props: PokerTableViewProps) {
         </div>
       </div>
 
-      {/* Felt — a bounded oval table in its own container; top padding gives the
-          top-row seats headroom so their cards aren't clipped at the edge. */}
-      <div
-        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-3xl pb-2 pt-3 shadow-elevated sm:pb-10 sm:pt-12"
+      {/* Table on the left, betting + chat panel on the right. They stack on
+          small screens and sit side-by-side from lg up. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 lg:flex-row lg:gap-3">
+        {/* Felt — a bounded oval table; top padding gives the top-row seats headroom. */}
+        <div
+          className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-3xl pb-2 pt-3 shadow-elevated sm:pb-10 sm:pt-12"
         style={{
           background:
             "radial-gradient(120% 90% at 50% 8%, rgba(27,77,58,0.18), transparent 55%), #0c0d10",
@@ -635,10 +637,13 @@ export function PokerTableView(props: PokerTableViewProps) {
               );
             })()}
         </div>
-      </div>
+        </div>
 
-      {/* Action / buy-in — pinned just below the felt */}
-      <div className="shrink-0">
+        {/* Right-side panel: betting/action + chat. Stacks below the felt on
+            small screens; a fixed column on the right from lg up. */}
+        <aside className="flex shrink-0 flex-col gap-2.5 lg:w-[340px]">
+        {/* Action / buy-in */}
+        <div className="shrink-0">
         {isSpectator ? (
           <div className="card-surface flex flex-col items-center gap-2 p-4 text-center">
             <p className="text-sm text-ash">
@@ -775,6 +780,8 @@ export function PokerTableView(props: PokerTableViewProps) {
             </Button>
           </form>
         )}
+      </div>
+        </aside>
       </div>
     </div>
   );
