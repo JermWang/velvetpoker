@@ -316,6 +316,11 @@ export class TableRoom {
     return [...this.seats.values()].filter((s) => !this.isBotSeat(s)).length;
   }
 
+  /** Live count of seated (human) players — for the lobby's occupancy display. */
+  occupiedSeatCount(): number {
+    return this.humanCount();
+  }
+
   /**
    * Keep demo tables populated with bots: remove all bots when no human is
    * present (so the table idles), otherwise top up to a small target. Only

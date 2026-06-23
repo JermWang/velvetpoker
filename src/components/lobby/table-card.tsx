@@ -3,6 +3,7 @@ import { formatAmount, ASSET_SYMBOLS } from "@/lib/ledger/money";
 import type { Asset } from "@/lib/ledger/money";
 import { Button } from "@/components/ui/button";
 import { usdPriceForAsset, type AssetPrices } from "@/lib/pricing/prices";
+import { LiveSeats } from "./live-seats";
 
 // USD is the headline: clean whole dollars (with commas) at $1+, two decimals
 // only for sub-dollar micro stakes so blinds stay distinct.
@@ -85,8 +86,6 @@ export interface TableCardData {
   locked?: boolean;
 }
 
-const SUIT = "♠";
-
 export function TableCard({
   table,
   prices,
@@ -97,7 +96,6 @@ export function TableCard({
   /** Display ticker for the house token (public cash games are wagered in it). */
   tokenSymbol?: string;
 }) {
-  const seats = Array.from({ length: table.maxSeats }, (_, i) => i < table.seatsOccupied);
   const live = table.status === "ACTIVE";
 
   // The little currency pill: free play, the token for public cash games (the
@@ -197,27 +195,13 @@ export function TableCard({
           />
         </div>
 
-        {/* seat occupancy */}
-        <div className="relative mt-5">
-          <div className="flex items-center justify-between text-[11px] text-ash">
-            <span className="uppercase tracking-[0.2em]">Seats</span>
-            <span className="font-mono text-ivory">
-              {table.seatsOccupied}/{table.maxSeats}
-            </span>
-          </div>
-          <div className="mt-2 flex items-center gap-1.5">
-            {seats.map((filled, i) => (
-              <span
-                key={i}
-                className={`grid h-5 w-5 place-items-center rounded-full border border-white/70 text-[10px] ${
-                  filled ? "bg-velvet/15 text-velvet" : "text-ash/40"
-                }`}
-              >
-                {filled ? SUIT : ""}
-              </span>
-            ))}
-          </div>
-        </div>
+        {/* seat occupancy — live, polls the ws server so it reflects who's
+            actually seated (incl. the in-memory free table) */}
+        <LiveSeats
+          tableId={table.id}
+          maxSeats={table.maxSeats}
+          initialOccupied={table.seatsOccupied}
+        />
 
         <div className="relative mt-5 flex items-center justify-between">
           {table.isDemo ? (

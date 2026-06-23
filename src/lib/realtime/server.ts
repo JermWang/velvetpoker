@@ -435,6 +435,24 @@ export function startServer(
   // Wrap the WS server in a plain HTTP server so the host's healthcheck (an
   // HTTP GET) succeeds and the WebSocket upgrade shares the same bound port.
   const httpServer = http.createServer((req, res) => {
+    // Live seat occupancy for the lobby. Demo tables keep their seats only in
+    // this process's memory (no DB rows), so the lobby can't get live counts any
+    // other way. Public, non-sensitive counts → permissive CORS so the web app
+    // (a different origin) can poll it directly.
+    const path = (req.url ?? "/").split("?")[0];
+    if (path === "/occupancy") {
+      const out: Record<string, number> = {};
+      for (const [tableId, entry] of rooms) {
+        out[tableId] = entry.room.occupiedSeatCount();
+      }
+      res.writeHead(200, {
+        "content-type": "application/json",
+        "access-control-allow-origin": "*",
+        "cache-control": "no-store",
+      });
+      res.end(JSON.stringify(out));
+      return;
+    }
     res.writeHead(200, { "content-type": "text/plain" });
     res.end("velvet-poker-ws ok");
   });
