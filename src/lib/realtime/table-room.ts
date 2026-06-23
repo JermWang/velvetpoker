@@ -322,6 +322,19 @@ export class TableRoom {
   }
 
   /**
+   * First unoccupied seat index, or null if the table is full. Reads the
+   * authoritative occupied-seat map directly — NOT buildTableState(), which now
+   * emits the full ring (every index present), where "free seat" can't be
+   * derived from seat presence.
+   */
+  firstFreeSeat(): number | null {
+    for (let i = 0; i < this.config.maxSeats; i++) {
+      if (!this.seats.has(i)) return i;
+    }
+    return null;
+  }
+
+  /**
    * Keep demo tables populated with bots: remove all bots when no human is
    * present (so the table idles), otherwise top up to a small target. Only
    * mutates between hands.

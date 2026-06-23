@@ -241,7 +241,7 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
               ? table.maxBuyIn
               : amount;
         const seatNumber =
-          event.seatNumber ?? nextFreeSeat(room, table.maxSeats);
+          event.seatNumber ?? room.firstFreeSeat();
         if (seatNumber === null) {
           sendTo(client, { t: "ERROR", message: "No free seat" });
           break;
@@ -302,7 +302,7 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
         });
         break;
       }
-      const seatNumber = event.seatNumber ?? nextFreeSeat(room, table.maxSeats);
+      const seatNumber = event.seatNumber ?? room.firstFreeSeat();
       if (seatNumber === null) {
         sendTo(client, { t: "ERROR", message: "No free seat" });
         break;
@@ -420,12 +420,6 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
       }
       break;
   }
-}
-
-function nextFreeSeat(room: TableRoom, maxSeats: number): number | null {
-  const taken = new Set(room.buildTableState().seats.map((s) => s.seat));
-  for (let i = 0; i < maxSeats; i++) if (!taken.has(i)) return i;
-  return null;
 }
 
 export function startServer(

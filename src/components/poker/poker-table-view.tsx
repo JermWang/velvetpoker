@@ -577,8 +577,12 @@ export function PokerTableView(props: PokerTableViewProps) {
                     asset={props.asset}
                     isDealer={table.dealerSeat === s.seat}
                     isToAct={table.toActSeat === s.seat}
-                    isYou={s.playerId === youToken}
-                    holeCards={s.playerId === youToken ? state.holeCards : null}
+                    isYou={s.playerId != null && s.playerId === youToken}
+                    holeCards={
+                      s.playerId != null && s.playerId === youToken
+                        ? state.holeCards
+                        : null
+                    }
                     clock={table.toActSeat === s.seat ? clock : null}
                     revealCards={showdownBySeat.get(s.seat)?.cards ?? null}
                     handLabel={showdownBySeat.get(s.seat)?.handDescription ?? null}
