@@ -40,23 +40,8 @@ export default async function LobbyPage() {
     isDemo: t.isDemo,
   }));
 
-  // Locked higher-stakes tiers — visual placeholders only (not joinable). They
-  // round the lobby grid to a clean 3×2 and tease the stake ladder. USDC base
-  // units (6dp); easy to adjust or promote to real rooms later.
-  const comingSoon: TableCardData[] = [
-    {
-      id: "soon-250", name: "Velvet — $250", asset: "USDC",
-      smallBlind: 1_250_000n, bigBlind: 2_500_000n,
-      minBuyIn: 125_000_000n, maxBuyIn: 250_000_000n,
-      maxSeats: 6, seatsOccupied: 0, visibility: "PUBLIC", status: "WAITING", locked: true,
-    },
-    {
-      id: "soon-500", name: "Velvet — $500", asset: "USDC",
-      smallBlind: 2_500_000n, bigBlind: 5_000_000n,
-      minBuyIn: 250_000_000n, maxBuyIn: 500_000_000n,
-      maxSeats: 6, seatsOccupied: 0, visibility: "PUBLIC", status: "WAITING", locked: true,
-    },
-  ];
+  // Games actually being played (a hand in progress), vs tables merely open.
+  const inPlay = data.filter((t) => t.status === "ACTIVE").length;
 
   return (
     <div className="space-y-10 py-2">
@@ -92,20 +77,22 @@ export default async function LobbyPage() {
             <h2 className="mt-1 font-display text-2xl text-ivory">Public tables</h2>
           </div>
           <span className="text-sm text-ash">
-            {data.length} {data.length === 1 ? "game" : "games"} running
+            {inPlay > 0
+              ? `${inPlay} in play · ${data.length} open`
+              : `${data.length} ${data.length === 1 ? "table" : "tables"} open`}
           </span>
         </div>
 
         {data.length === 0 ? (
           <div className="glass p-12 text-center">
-            <p className="text-ash">No public tables are running right now.</p>
+            <p className="text-ash">No public tables are open right now.</p>
             <Link href="/app/host" className="mt-4 inline-block">
               <Button>Be the first to host</Button>
             </Link>
           </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {[...data, ...comingSoon].map((t) => (
+            {data.map((t) => (
               <TableCard key={t.id} table={t} prices={prices} tokenSymbol={TOKEN_TAG} />
             ))}
           </div>
