@@ -181,7 +181,7 @@ export function PokerTableView(props: PokerTableViewProps) {
     });
   }
 
-  function buyIn(amount: string, password?: string) {
+  function buyIn(amount: string, password?: string, seatNumber?: number) {
     try {
       const lamports = parseAmount(props.asset, amount);
       send({
@@ -189,10 +189,17 @@ export function PokerTableView(props: PokerTableViewProps) {
         tableId: props.tableId,
         amount: lamports.toString(),
         ...(password ? { password } : {}),
+        ...(seatNumber != null ? { seatNumber } : {}),
       });
     } catch {
       /* ignore parse errors; the field guides format */
     }
+  }
+
+  // Free play: tap an open seat to sit straight down with a free stack — no
+  // module, no amount to pick.
+  function sitFree(seatNumber: number) {
+    buyIn(formatAmount(props.asset, BigInt(props.maxBuyIn)), undefined, seatNumber);
   }
 
   function toggleSitOut() {
@@ -551,23 +558,35 @@ export function PokerTableView(props: PokerTableViewProps) {
                     +{formatAmount(props.asset, winAmt)} {unit}
                   </div>
                 )}
-                <Seat
-                  seat={s}
-                  asset={props.asset}
-                  isDealer={table.dealerSeat === s.seat}
-                  isToAct={table.toActSeat === s.seat}
-                  isYou={s.playerId === youToken}
-                  holeCards={s.playerId === youToken ? state.holeCards : null}
-                  clock={table.toActSeat === s.seat ? clock : null}
-                  revealCards={showdownBySeat.get(s.seat)?.cards ?? null}
-                  handLabel={showdownBySeat.get(s.seat)?.handDescription ?? null}
-                  show3d={showdownBySeat.size > 0}
-                  isWinner={winAmt != null}
-                  compact={isMobile}
-                  videoTrack={
-                    s.playerId ? (media.videoBySeat.get(s.playerId) ?? null) : null
-                  }
-                />
+                {/* Free play: empty seats are tap-to-sit (no buy-in module). */}
+                {!s.playerId && props.demo && !seated && !isSpectator ? (
+                  <button
+                    type="button"
+                    onClick={() => sitFree(s.seat)}
+                    aria-label={`Sit at seat ${s.seat + 1}`}
+                    className="grid h-11 w-11 place-items-center rounded-full border border-dashed border-velvet/60 bg-velvet/10 text-[9px] font-semibold uppercase tracking-wide text-velvet transition-colors hover:border-velvet hover:bg-velvet/25 hover:text-ivory"
+                  >
+                    Sit
+                  </button>
+                ) : (
+                  <Seat
+                    seat={s}
+                    asset={props.asset}
+                    isDealer={table.dealerSeat === s.seat}
+                    isToAct={table.toActSeat === s.seat}
+                    isYou={s.playerId === youToken}
+                    holeCards={s.playerId === youToken ? state.holeCards : null}
+                    clock={table.toActSeat === s.seat ? clock : null}
+                    revealCards={showdownBySeat.get(s.seat)?.cards ?? null}
+                    handLabel={showdownBySeat.get(s.seat)?.handDescription ?? null}
+                    show3d={showdownBySeat.size > 0}
+                    isWinner={winAmt != null}
+                    compact={isMobile}
+                    videoTrack={
+                      s.playerId ? (media.videoBySeat.get(s.playerId) ?? null) : null
+                    }
+                  />
+                )}
               </div>
             );
           })}
@@ -622,14 +641,20 @@ export function PokerTableView(props: PokerTableViewProps) {
             <ConnectButton label="Connect wallet to take a seat" />
           </div>
         ) : !seated ? (
-          <BuyInPanel
-            asset={props.asset}
-            minBuyIn={BigInt(props.minBuyIn)}
-            maxBuyIn={BigInt(props.maxBuyIn)}
-            onBuyIn={buyIn}
-            demo={props.demo}
-            requiresPassword={props.requiresPassword}
-          />
+          props.demo ? (
+            <p className="rounded-2xl border border-velvet/25 bg-velvet/[0.06] py-3 text-center text-sm text-velvet/90">
+              Tap an open seat to sit down with a free stack.
+            </p>
+          ) : (
+            <BuyInPanel
+              asset={props.asset}
+              minBuyIn={BigInt(props.minBuyIn)}
+              maxBuyIn={BigInt(props.maxBuyIn)}
+              onBuyIn={buyIn}
+              demo={props.demo}
+              requiresPassword={props.requiresPassword}
+            />
+          )
         ) : isYourTurn && table ? (
           <ActionBar
             asset={props.asset}
