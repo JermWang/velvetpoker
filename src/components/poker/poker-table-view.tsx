@@ -399,17 +399,20 @@ export function PokerTableView(props: PokerTableViewProps) {
         </div>
       </div>
 
-      {/* Felt — an oval table with a leather rail and players seated around the rim */}
+      {/* Felt — breaks out of the app column to span the full viewport width so
+          the table reads big and immersive, not a small boxed container. */}
       <div
-        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-3xl shadow-elevated"
+        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden"
         style={{
+          width: "100vw",
+          marginLeft: "calc(50% - 50vw)",
           background:
-            "radial-gradient(120% 90% at 50% 8%, rgba(27,77,58,0.18), transparent 55%), #0c0d10",
+            "radial-gradient(120% 90% at 50% 0%, rgba(27,77,58,0.16), transparent 60%)",
         }}
       >
-        {/* Lock the table to the Claude-design aspect (1180×560) so the oval keeps
-            its proportions instead of stretching to fill the column. */}
-        <div className="relative h-full w-full sm:aspect-[1180/560] sm:h-auto sm:max-h-full sm:max-w-5xl">
+        {/* Keep the Claude-design aspect (1180×560) so the oval stays proportional;
+            grow it as large as the viewport height allows. */}
+        <div className="relative h-full w-full sm:aspect-[1180/560] sm:h-auto sm:max-h-full sm:max-w-[1500px]">
           {/* Rail + felt surface — insets match the prototype (18px / 96px on
               1180×560 ≈ 3.2% vertical, 8.1% horizontal). */}
           <div className="pointer-events-none absolute" style={{ inset: "3.2% 8.1%" }}>
