@@ -248,6 +248,39 @@ export class TableRoom {
     return true;
   }
 
+  /**
+   * Rehydrate seats after a process restart (crash recovery). Stacks come from
+   * the ledger — the authoritative record of each player's funds locked at this
+   * table — so an interrupted process never strands those funds: the room is
+   * rebuilt and players reconnect to their seat + stack. Any hand that was
+   * in-flight at crash time is simply voided (the ledger never settled it, so
+   * stacks here are the correct pre-hand values).
+   *
+   * Restored players start DISCONNECTED (they re-activate on JOIN_TABLE) and are
+   * assigned to the lowest free seats. No-op once the room has any seats.
+   */
+  restoreSeats(
+    players: Array<{ playerId: string; displayName: string; stack: bigint }>,
+  ): void {
+    if (this.seats.size > 0) return;
+    let seatNumber = 0;
+    for (const p of players) {
+      if (p.stack <= 0n) continue;
+      while (this.seats.has(seatNumber)) seatNumber++;
+      if (seatNumber >= this.config.maxSeats) break;
+      this.seats.set(seatNumber, {
+        seatNumber,
+        playerId: p.playerId,
+        displayName: p.displayName,
+        stack: p.stack,
+        sittingOut: false,
+        connected: false,
+      });
+      seatNumber++;
+    }
+    if (this.seats.size > 0) this.broadcastSeats();
+  }
+
   /** Add chips to a seated player between hands (top-up/rebuy). */
   topUp(playerId: string, amount: bigint): void {
     const seat = this.findSeatByPlayer(playerId);

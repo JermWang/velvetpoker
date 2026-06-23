@@ -18,6 +18,7 @@ import {
   LedgerError,
 } from "@/lib/ledger/ledger";
 import { recordRiskEvent } from "@/lib/risk/risk-events";
+import { sendOpsAlert } from "@/lib/risk/alert";
 import { getSolanaProvider } from "./connection";
 
 export interface RequestWithdrawalResult {
@@ -257,6 +258,10 @@ async function failWithdrawal(withdrawalId: string, note: string): Promise<void>
       data: { status: "FAILED", reviewNote: note.slice(0, 480) },
     });
   });
+  // Terminal state — alert once so an operator can investigate the on-chain send.
+  sendOpsAlert(
+    `withdrawal ${withdrawalId} marked FAILED (balance refunded): ${note.slice(0, 300)}`,
+  );
 }
 
 /** Rolling window for per-user withdrawal velocity. */

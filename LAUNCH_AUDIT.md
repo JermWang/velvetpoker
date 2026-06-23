@@ -25,9 +25,17 @@
 1. **Apply `prisma/sql/001-balance-nonneg-and-ledger-idempotency.sql`** to the production DB (Supabase SQL editor). It adds the non-negative-balance CHECK constraint and the ledger idempotency unique index — the DB-level backstops behind the overdraft + idempotency fixes. Run the two pre-check SELECTs first.
 2. Confirm `ENABLE_DEV_COMPLIANCE_APPROVAL` matches your intent on Railway (you chose to keep auto-approve).
 
-### ⚠️ STILL OPEN (systemic gaps from the completeness critic — NOT fixed this session)
-These need manual verification/work before or right after launch — see §3 below for detail:
-WS-crash in-flight chip recovery · settlement failure halt+alert · `RUN_BACKGROUND_WORKERS=false` on the ws service · withdrawal-processor max-attempts/FAILED transition · abandoned-real-money-seat timeout · on-chain reconciliation (HIGH) · deposit fee-payer attribution for CEX withdrawals (HIGH) · alerting on money-critical failures.
+### ✅ Systemic gaps fixed (second pass)
+- **WS-crash recovery** — table rooms now rebuild seats from the ledger on startup (`reconstructSeatedStacks` → `restoreSeats`), so locked funds are never stranded after a restart; an interrupted hand is voided (ledger never settled it). +4 regression tests.
+- **Money-failure alerting** — `sendOpsAlert` now fires on: hand-settlement ledger write failure (CRITICAL — stacks diverge from ledger), hand-completion persistence failure, cash-out failure, buy-in-refund failure, withdrawal send→FAILED, and seat-restore failure. (Reconciliation mismatch + ws crash already alerted.)
+- **Correction:** the audit's "withdrawal-processor retries forever" was inaccurate — `sendApprovedWithdrawal` already moves a failed send to terminal `FAILED` (refunding the balance), so it is never re-picked. Now also alerts once on that transition.
+
+### ⚠️ STILL OPEN (verify/decide before or right after launch)
+- `RUN_BACKGROUND_WORKERS=false` on the ws Railway service (deploy config).
+- On-chain treasury reconciliation — compare ledger liabilities to actual chain balances (HIGH).
+- Deposit sender attribution by fee-payer drops CEX-withdrawal deposits (HIGH).
+- Abandoned-real-money-seat timeout (a disconnected player's seat is held indefinitely).
+- Optional: HALT dealing (not just alert) when settlement fails repeatedly.
 
 ---
 

@@ -19,7 +19,7 @@ import { canPlayRealMoney } from "@/lib/compliance/gates";
 import { verifyPassword } from "@/lib/crypto";
 import { formatAmount } from "@/lib/ledger/money";
 import { TableRoom, type RoomConfig } from "./table-room";
-import { attachHandPersistence } from "./persistence";
+import { attachHandPersistence, reconstructSeatedStacks } from "./persistence";
 import { decode, encode, type ServerEvent } from "./events";
 import { verifyWsTicket } from "./ws-ticket";
 import { startBackgroundWorkers } from "@/lib/jobs/worker";
@@ -140,6 +140,26 @@ async function createRoom(tableId: string): Promise<RoomEntry | null> {
       asset: table.asset,
       isPrivate: table.visibility === "PRIVATE",
     });
+
+    // CRASH RECOVERY: if this process restarted with players still holding funds
+    // locked at this table, rebuild their seats from the ledger so the money is
+    // never stranded. Stacks are the authoritative net USER_TABLE_LOCKED per
+    // player; restored players reconnect into their seat (JOIN_TABLE). Any hand
+    // interrupted by the crash is voided (the ledger never settled it).
+    try {
+      const restored = await reconstructSeatedStacks(table.id, table.asset);
+      if (restored.length > 0) {
+        room.restoreSeats(restored);
+        console.log(
+          `[ws] restored ${restored.length} seat(s) from ledger for table ${table.id}`,
+        );
+      }
+    } catch (e) {
+      console.error("[ws] seat restore failed", e);
+      sendOpsAlert(
+        `seat restore from ledger FAILED for table ${table.id}: ${String(e)} — players with locked funds may not see their seat until this is resolved.`,
+      );
+    }
   }
 
   const entry: RoomEntry = { room, clients, isDemo: table.isDemo };
@@ -326,6 +346,11 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
           });
         } catch (refundErr) {
           console.error("[ws] buy-in refund failed", refundErr);
+          sendOpsAlert(
+            `buy-in refund FAILED for user ${userId} table ${table.id} amount ${amount}: ${String(
+              refundErr,
+            )} — funds may be locked with no seat; reconcile.`,
+          );
         }
         // sit() already sent a specific ERROR for the race cases; only the
         // full-table case needs a message here.
@@ -437,6 +462,11 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
           });
         } catch (err) {
           console.error("[ws] cashOutSeat failed", err);
+          sendOpsAlert(
+            `cash-out FAILED for user ${userId} table ${table.id} amount ${returned}: ${String(
+              err,
+            )} — funds remain locked at the table; player asked to retry.`,
+          );
           // Funds are still safely locked and the seat is intact — restore the
           // player so nothing is lost, and let them retry leaving.
           room.setSitOut(userId, false);

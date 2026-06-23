@@ -8,7 +8,52 @@
 import { prisma } from "@/lib/db/prisma";
 import { settleHandLedger, type RakeSplit } from "@/lib/ledger/ledger";
 import { splitRakeThreeWays, splitRakePrivate } from "@/lib/poker/rake";
+import { sendOpsAlert } from "@/lib/risk/alert";
 import type { Asset } from "@prisma/client";
+
+/**
+ * Reconstruct each player's current at-table stack from the ledger: the net of
+ * their USER_TABLE_LOCKED entries for this table IS their seated stack (it only
+ * moves at buy-in, cash-out, and settlement — all atomic). Used to rebuild a
+ * table room after a process restart so locked funds are never stranded.
+ */
+export async function reconstructSeatedStacks(
+  tableId: string,
+  asset: Asset,
+): Promise<Array<{ playerId: string; displayName: string; stack: bigint }>> {
+  const grouped = await prisma.ledgerEntry.groupBy({
+    by: ["userId", "direction"],
+    where: {
+      tableId,
+      asset,
+      accountType: "USER_TABLE_LOCKED",
+      userId: { not: null },
+    },
+    _sum: { amount: true },
+  });
+
+  const net = new Map<string, bigint>();
+  for (const g of grouped) {
+    if (!g.userId) continue;
+    const sign = g.direction === "CREDIT" ? 1n : -1n;
+    net.set(g.userId, (net.get(g.userId) ?? 0n) + sign * (g._sum.amount ?? 0n));
+  }
+
+  const seated = [...net.entries()].filter(([, v]) => v > 0n);
+  if (seated.length === 0) return [];
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: seated.map(([id]) => id) } },
+    select: { id: true, displayName: true },
+  });
+  const nameById = new Map(users.map((u) => [u.id, u.displayName ?? "Player"]));
+
+  return seated.map(([playerId, stack]) => ({
+    playerId,
+    displayName: nameById.get(playerId) ?? "Player",
+    stack,
+  }));
+}
 import type {
   HandCompletedInfo,
   HandSettlement,
@@ -207,7 +252,15 @@ export function attachHandPersistence(
     try {
       await persistHandSettled(table, s);
     } catch (e) {
+      // CRITICAL: the pot moved in memory but the ledger never recorded it, so
+      // the live stacks now diverge from the source-of-truth ledger. Make it
+      // loud — this needs immediate operator attention (and a reconciliation).
       console.error("[persist] settle failed", e);
+      sendOpsAlert(
+        `CRITICAL hand-settlement ledger write FAILED for table ${table.id} hand ${s.handId}: ${String(
+          e,
+        )} — in-memory stacks now diverge from the ledger; reconcile.`,
+      );
     }
   };
   room.onHandCompleted = async (i) => {
@@ -216,6 +269,11 @@ export function attachHandPersistence(
       await persistHandCompleted(i);
     } catch (e) {
       console.error("[persist] complete failed", e);
+      sendOpsAlert(
+        `hand-completion persistence FAILED for table ${i.tableId} hand #${i.handNumber}: ${String(
+          e,
+        )} — history/anchor rows may be incomplete.`,
+      );
     }
     hooks?.afterHandCompleted?.(i);
   };
