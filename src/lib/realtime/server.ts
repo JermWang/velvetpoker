@@ -260,8 +260,10 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
             : amount > table.maxBuyIn
               ? table.maxBuyIn
               : amount;
+        // Full table? Reclaim a busted seat to make room (kick if there's a
+        // queue); otherwise there's genuinely no seat.
         const seatNumber =
-          event.seatNumber ?? room.firstFreeSeat();
+          event.seatNumber ?? room.firstFreeSeat() ?? room.evictOneBustedSeat();
         if (seatNumber === null) {
           sendTo(client, { t: "ERROR", message: "No free seat" });
           break;
@@ -326,7 +328,10 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
       // where a concurrent BUY_IN took the seat / already seated us while we
       // awaited the ledger), the funds we just locked have no seat backing them —
       // refund them immediately so they are never stranded in table-locked.
-      const seatNumber = event.seatNumber ?? room.firstFreeSeat();
+      // Full table? Reclaim a busted seat to make room (kick if there's a queue);
+      // otherwise the funds we locked have no seat and are refunded below.
+      const seatNumber =
+        event.seatNumber ?? room.firstFreeSeat() ?? room.evictOneBustedSeat();
       const seated =
         seatNumber !== null &&
         room.sit({

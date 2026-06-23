@@ -62,3 +62,23 @@ describe("crash recovery: restoreSeats", () => {
     expect(room.occupiedSeatCount()).toBe(1);
   });
 });
+
+describe("busted-seat eviction (queue-aware rebuy)", () => {
+  it("reclaims a busted (zero-stack, sitting-out) seat to make room", () => {
+    const room = makeRoom();
+    // A busted player keeps their seat (zero stack, sitting out) — no auto-free.
+    room.sit({ playerId: "bob", displayName: "Bob", seatNumber: 1, stack: 0n });
+    room.setSitOut("bob", true);
+    expect(room.hasPlayer("bob")).toBe(true);
+    const freed = room.evictOneBustedSeat();
+    expect(freed).toBe(1);
+    expect(room.hasPlayer("bob")).toBe(false);
+  });
+
+  it("does not evict a seat that still has chips", () => {
+    const room = makeRoom();
+    room.sit({ playerId: "alice", displayName: "Alice", seatNumber: 0, stack: 100n });
+    expect(room.evictOneBustedSeat()).toBe(null);
+    expect(room.hasPlayer("alice")).toBe(true);
+  });
+});

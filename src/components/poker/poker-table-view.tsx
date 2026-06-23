@@ -108,13 +108,17 @@ export function PokerTableView(props: PokerTableViewProps) {
   });
   const [chatInput, setChatInput] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   // Chat is collapsed by default. Auto-open it whenever a message is sent or
   // received so messages are never silently invisible (which reads as "chat is
   // broken"), and keep the history scrolled to the newest line.
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const prevChatLen = useRef(0);
   useEffect(() => {
-    if (state.chat.length > prevChatLen.current) setChatOpen(true);
+    if (state.chat.length > prevChatLen.current) {
+      setChatOpen(true);
+      setHistoryOpen(false);
+    }
     prevChatLen.current = state.chat.length;
   }, [state.chat.length]);
   useEffect(() => {
@@ -769,8 +773,41 @@ export function PokerTableView(props: PokerTableViewProps) {
         )}
       </div>
 
-      {/* Chat — a single compact row; history floats above when opened */}
+      {/* Chat + hand history — a single compact row; panels float above when opened */}
       <div className="relative shrink-0">
+        {historyOpen && (
+          <div className="absolute bottom-full mb-2 max-h-48 w-full space-y-1.5 overflow-y-auto rounded-xl border border-white/10 bg-charcoal-900/95 p-3 text-sm shadow-elevated backdrop-blur">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ash">
+              Recent hands
+            </p>
+            {state.handHistory.length === 0 ? (
+              <p className="text-xs text-ash/60">No hands yet this session.</p>
+            ) : (
+              [...state.handHistory].reverse().map((h, i) => (
+                <div
+                  key={h.handId + ":" + i}
+                  className="border-b border-white/5 pb-1.5 text-xs last:border-0"
+                >
+                  <span className="font-mono text-ash">
+                    {h.handNumber != null ? `#${h.handNumber}` : "—"}
+                  </span>{" "}
+                  {h.winners.length === 0 ? (
+                    <span className="text-ash/70">folded through (no showdown)</span>
+                  ) : (
+                    h.winners.map((w, j) => (
+                      <span key={j} className="text-ash">
+                        {j > 0 ? " · " : ""}
+                        <span className="text-ivory">{w.name}</span> won{" "}
+                        {formatAmount(props.asset, BigInt(w.amount))} {unit}
+                        {w.description ? ` (${w.description})` : ""}
+                      </span>
+                    ))
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        )}
         {chatOpen && (
           <div
             ref={chatScrollRef}
@@ -787,41 +824,59 @@ export function PokerTableView(props: PokerTableViewProps) {
             )}
           </div>
         )}
-        {isSpectator ? (
-          <p className="text-center text-xs text-ash/60">
-            Connect your wallet to join the conversation.
-          </p>
-        ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!chatInput.trim()) return;
-              send({ t: "SEND_CHAT", tableId: props.tableId, message: chatInput });
-              setChatInput("");
-              setChatOpen(true);
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setHistoryOpen((o) => !o);
+              setChatOpen(false);
             }}
-            className="flex items-center gap-2"
+            aria-label="Hand history"
+            title="Hand history"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 text-sm text-ash transition-colors hover:text-ivory"
           >
-            <button
-              type="button"
-              onClick={() => setChatOpen((o) => !o)}
-              aria-label="Toggle table chat"
-              title="Table chat"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 text-sm text-ash transition-colors hover:text-ivory"
+            📜
+          </button>
+          {isSpectator ? (
+            <p className="flex-1 text-xs text-ash/60">
+              Connect your wallet to join the conversation.
+            </p>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!chatInput.trim()) return;
+                send({ t: "SEND_CHAT", tableId: props.tableId, message: chatInput });
+                setChatInput("");
+                setChatOpen(true);
+                setHistoryOpen(false);
+              }}
+              className="flex flex-1 items-center gap-2"
             >
-              💬
-            </button>
-            <input
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Say something…"
-              className="h-9 flex-1 rounded-lg border border-white/10 bg-charcoal-900/60 px-3 text-sm text-ivory placeholder:text-ash/50 focus:outline-none"
-            />
-            <Button size="sm" variant="secondary" type="submit">
-              Send
-            </Button>
-          </form>
-        )}
+              <button
+                type="button"
+                onClick={() => {
+                  setChatOpen((o) => !o);
+                  setHistoryOpen(false);
+                }}
+                aria-label="Toggle table chat"
+                title="Table chat"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/5 text-sm text-ash transition-colors hover:text-ivory"
+              >
+                💬
+              </button>
+              <input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Say something…"
+                className="h-9 flex-1 rounded-lg border border-white/10 bg-charcoal-900/60 px-3 text-sm text-ivory placeholder:text-ash/50 focus:outline-none"
+              />
+              <Button size="sm" variant="secondary" type="submit">
+                Send
+              </Button>
+            </form>
+          )}
+        </div>
       </div>
         </aside>
       </div>

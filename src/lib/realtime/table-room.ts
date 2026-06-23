@@ -287,12 +287,16 @@ export class TableRoom {
     if (seat) {
       const wasBusted = seat.stack === 0n;
       seat.stack += amount;
-      // Bought back in after busting → cancel the grace timer and return to play.
+      // Bought back in after busting → return to play.
       if (wasBusted && seat.stack > 0n) {
         seat.sittingOut = false;
         this.cancelBustGrace(playerId);
       }
       this.broadcastSeats();
+      // Resume play: a rebuy/top-up between hands must kick off the next hand if
+      // the table now has enough active players. Without this the rebuying player
+      // gets chips but the table sits idle forever (looks like "rebuy is broken").
+      this.maybeStartHand();
     }
   }
 
@@ -301,6 +305,8 @@ export class TableRoom {
     if (seat) {
       seat.sittingOut = sitOut;
       this.broadcastSeats();
+      // Coming back from sitting out should resume play if enough players are in.
+      if (!sitOut) this.maybeStartHand();
     }
   }
 
@@ -362,8 +368,6 @@ export class TableRoom {
   private static readonly DEMO_TARGET_PLAYERS = 5;
   /** Wait this long for real opponents before filling a demo table with bots. */
   private static readonly BOT_FILL_DELAY_MS = 30_000;
-  /** A busted player keeps their seat this long to buy back before it's freed. */
-  private static readonly BUST_GRACE_MS = 30_000;
 
   private isBotSeat(s: RoomSeat): boolean {
     return isBotId(s.playerId);
@@ -432,16 +436,26 @@ export class TableRoom {
     }
   }
 
-  /** Give a busted player BUST_GRACE_MS to buy back before freeing their seat. */
-  private startBustGrace(playerId: string): void {
-    if (this.bustTimers.has(playerId)) return;
-    const t = setTimeout(() => {
-      this.bustTimers.delete(playerId);
-      const seat = this.findSeatByPlayer(playerId);
-      // Still busted and didn't buy back → free the seat.
-      if (seat && seat.stack === 0n) this.leave(playerId);
-    }, TableRoom.BUST_GRACE_MS);
-    this.bustTimers.set(playerId, t);
+  /**
+   * Reclaim ONE busted seat (sitting out with a zero stack) to make room for a
+   * new player when the table is otherwise full — the "kick if there's a queue"
+   * rule. Busted seats have no chips to return (a real-money cash-out of 0 is a
+   * no-op), so this just vacates the seat. Returns the freed seat number, or null
+   * if there is no busted seat to reclaim. Bots are never evicted here (demo bot
+   * count is managed separately).
+   */
+  evictOneBustedSeat(): number | null {
+    const busted = [...this.seats.values()]
+      .filter((s) => s.stack === 0n && s.sittingOut && !this.isBotSeat(s))
+      .sort((a, b) => a.seatNumber - b.seatNumber)[0];
+    if (!busted) return null;
+    const seatNumber = busted.seatNumber;
+    this.send(busted.playerId, {
+      t: "ERROR",
+      message: "Your seat was given up — you were out of chips and another player took the seat. Buy in again to keep playing.",
+    });
+    this.leave(busted.playerId);
+    return seatNumber;
   }
 
   private cancelBustGrace(playerId: string): void {
@@ -871,11 +885,12 @@ export class TableRoom {
       const finalStack = es.stack - rakeShare;
       deltas.push({ playerId: es.playerId, net: finalStack - startStack });
       roomSeat.stack = finalStack;
-      // Bust-out: sit them out but keep the seat for a 30s buy-back window
-      // before it's freed (so you stay seated until you bust AND don't rebuy).
+      // Bust-out: sit them out but KEEP the seat so they can rebuy at will (free
+      // play OR wagered, public OR private). There's no time limit — the seat is
+      // only reclaimed if a NEW player needs it and the table is full (see
+      // evictOneBustedSeat). No queue waiting → keep your seat and rebuy.
       if (roomSeat.stack === 0n) {
         roomSeat.sittingOut = true;
-        this.startBustGrace(roomSeat.playerId);
       }
     }
 

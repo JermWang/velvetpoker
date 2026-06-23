@@ -17,7 +17,20 @@ export interface TableSocketState {
   minRaiseTo: bigint;
   chat: Array<{ from: string; message: string; at: number }>;
   lastShowdown: Extract<ServerEvent, { t: "SHOWDOWN" }> | null;
+  /** Recent completed hands at this table (newest last), for the in-game feed. */
+  handHistory: HandHistoryEntry[];
   error: string | null;
+}
+
+export interface HandHistoryEntry {
+  handId: string;
+  /** Hand number parsed from the room handId ("tableId:handNumber"). */
+  handNumber: number | null;
+  board: Card[];
+  winners: Array<{ name: string; amount: string; description: string }>;
+  /** Everyone who reached showdown (revealed cards), for review. */
+  shown: Array<{ name: string; cards: Card[]; description: string }>;
+  at: number;
 }
 
 export interface UseTableSocketArgs {
@@ -50,6 +63,7 @@ export function useTableSocket({
     minRaiseTo: 0n,
     chat: [],
     lastShowdown: null,
+    handHistory: [],
     error: null,
   });
 
@@ -162,8 +176,38 @@ function reduce(s: TableSocketState, e: ServerEvent): TableSocketState {
       };
     case "PLAYER_ACTION_APPLIED":
       return { ...s, yourTurnSeat: null, actionDeadline: null };
-    case "SHOWDOWN":
-      return { ...s, lastShowdown: e };
+    case "SHOWDOWN": {
+      // Resolve seat -> display name from the current table so the feed reads
+      // naturally (the wire uses opaque per-seat tokens, not names).
+      const nameFor = (seat: number) =>
+        s.table?.seats.find((x) => x.seat === seat)?.displayName ?? `Seat ${seat}`;
+      const num = Number(e.handId.split(":").pop());
+      const entry: HandHistoryEntry = {
+        handId: e.handId,
+        handNumber: Number.isFinite(num) ? num : null,
+        board: s.table?.community ?? [],
+        winners: e.results
+          .filter((r) => BigInt(r.amountWon) > 0n)
+          .map((r) => ({
+            name: nameFor(r.seat),
+            amount: r.amountWon,
+            description: r.handDescription,
+          })),
+        shown: e.results
+          .filter((r) => r.cards.length > 0)
+          .map((r) => ({
+            name: nameFor(r.seat),
+            cards: r.cards,
+            description: r.handDescription,
+          })),
+        at: Date.now(),
+      };
+      return {
+        ...s,
+        lastShowdown: e,
+        handHistory: [...s.handHistory.slice(-29), entry],
+      };
+    }
     case "CHAT":
       return {
         ...s,
