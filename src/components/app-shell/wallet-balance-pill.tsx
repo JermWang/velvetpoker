@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatAmount, ASSET_SYMBOLS } from "@/lib/ledger/money";
+import { ASSET_SYMBOLS, ASSET_DECIMALS } from "@/lib/ledger/money";
 import type { Asset } from "@/lib/ledger/money";
 import { authedFetch } from "@/lib/auth/privy-token";
+
+/** Compact 2-decimal balance for the nav. Full precision lives on the cashier. */
+function shortBalance(asset: Asset, base: string): string {
+  return (Number(BigInt(base)) / 10 ** ASSET_DECIMALS[asset]).toFixed(2);
+}
 
 interface WireBalance {
   asset: Asset;
@@ -64,7 +69,7 @@ export function WalletBalancePill() {
             {ASSET_SYMBOLS[b.asset]}
           </span>
           <span className="font-mono text-sm text-ivory">
-            {balances ? formatAmount(b.asset, BigInt(b.amount)) : "…"}
+            {balances ? shortBalance(b.asset, b.amount) : "…"}
           </span>
         </div>
       ))}
