@@ -395,8 +395,14 @@ export class TableRoom {
     this.manageBots();
     const players = this.eligiblePlayers();
     if (players.length < 2) return;
-    // Demo tables only deal when an active human is in: bots never play alone.
-    if (this.config.isDemo && !players.some((p) => !this.isBotSeat(p))) return;
+    // Demo tables keep the game going as long as a real person is at the table —
+    // even one who is currently sitting out or just busted. They watch the bots
+    // play on and rebuy to rejoin; the table never freezes waiting on them. Bots
+    // only stop once every human has left (manageBots then clears them, so
+    // eligiblePlayers empties and we return above). This is what makes "the game
+    // continues regardless of whether the busted player buys back in" true for
+    // free play; real-money tables (no bots) continue via eligiblePlayers alone.
+    if (this.config.isDemo && this.humanCount() === 0) return;
     this.startHand(players);
   }
 
