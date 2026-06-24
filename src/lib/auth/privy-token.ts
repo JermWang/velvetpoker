@@ -37,8 +37,23 @@ export async function authedFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
 ): Promise<Response> {
-  const token = await getPrivyAccessToken();
-  const headers = new Headers(init.headers);
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  return fetch(input, { ...init, headers, credentials: "same-origin" });
+  const send = async (): Promise<Response> => {
+    const token = await getPrivyAccessToken();
+    const headers = new Headers(init.headers);
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return fetch(input, { ...init, headers, credentials: "same-origin" });
+  };
+
+  let res = await send();
+  // A 401 right after sign-in or mid token-refresh is usually transient: the
+  // token getter briefly returned null/stale, so the server fell back to a stale
+  // cookie. Back off to let a fresh token land and retry, so a blip never
+  // surfaces as a spurious "Unauthorized". Safe to retry — a 401 is rejected
+  // before any work happens server-side (no double-create).
+  for (const delay of [250, 600]) {
+    if (res.status !== 401) break;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    res = await send();
+  }
+  return res;
 }
