@@ -547,6 +547,53 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
   }
 }
 
+/** Grace before an empty private table is swept, so a host who just created one
+ *  isn't cleared while waiting for friends to arrive. */
+const PRIVATE_TABLE_SWEEP_AFTER_MS = 30 * 60_000;
+
+/**
+ * Close PRIVATE tables that have emptied out, so abandoned invite games don't
+ * pile up against the concurrent-private-table cap — the next group can always
+ * host. A table is swept only when: no one is seated, it's aged past the grace,
+ * AND no funds are still locked to it (never strand a player's chips).
+ */
+async function sweepEmptyPrivateTables(): Promise<void> {
+  try {
+    const tables = await prisma.pokerTable.findMany({
+      where: { visibility: "PRIVATE", status: { in: ["WAITING", "ACTIVE"] } },
+      select: { id: true, createdAt: true },
+    });
+    const now = Date.now();
+    for (const t of tables) {
+      const entry = rooms.get(t.id);
+      const occupied = entry?.room.occupiedSeatCount() ?? 0;
+      if (occupied > 0) continue; // someone's seated — leave it running
+      if (now - t.createdAt.getTime() < PRIVATE_TABLE_SWEEP_AFTER_MS) continue;
+      // Never close a table that still has chips locked to it (e.g. a player who
+      // hasn't reconnected after a restart) — that would strand their funds.
+      const lockedRows = await prisma.ledgerEntry.findMany({
+        where: { tableId: t.id, accountType: "USER_TABLE_LOCKED" },
+        select: { direction: true, amount: true },
+      });
+      let net = 0n;
+      for (const r of lockedRows) {
+        net += r.direction === "CREDIT" ? r.amount : -r.amount;
+      }
+      if (net > 0n) continue; // funds still parked here — leave it for recovery
+
+      await prisma.pokerTable.updateMany({
+        where: { id: t.id, status: { in: ["WAITING", "ACTIVE"] } },
+        data: { status: "CLOSED" },
+      });
+      // Drop a truly dead in-memory shell (empty + nobody connected).
+      if (entry && entry.clients.size === 0) rooms.delete(t.id);
+      console.log(`[ws] swept empty private table ${t.id}`);
+    }
+  } catch (e) {
+    console.error("[ws] sweepEmptyPrivateTables failed", e);
+  }
+}
+
 export function startServer(
   // Hosts (Railway, Render, etc.) inject a dynamic PORT for the service.
   port = process.env.PORT ? Number(process.env.PORT) : env.wsPort,
@@ -579,6 +626,11 @@ export function startServer(
   httpServer.listen(port, "0.0.0.0", () => {
     console.log(`[ws] Velvet Poker realtime server listening on :${port}`);
   });
+
+  // Periodically clear abandoned (empty + aged) private tables so they don't hold
+  // slots against the concurrent-private-table cap. First pass is one interval in
+  // (gives players time to reconnect after a restart before anything is swept).
+  setInterval(() => void sweepEmptyPrivateTables(), 10 * 60_000);
 
   wss.on("connection", async (ws, req) => {
     const url = new URL(req.url ?? "/", `http://localhost:${port}`);
