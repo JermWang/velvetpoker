@@ -5,23 +5,31 @@ import { ASSET_SYMBOLS, ASSET_DECIMALS } from "@/lib/ledger/money";
 import type { Asset } from "@/lib/ledger/money";
 import { authedFetch } from "@/lib/auth/privy-token";
 
-/** Compact 2-decimal balance for the nav. Full precision lives on the cashier. */
-function shortBalance(asset: Asset, base: string): string {
-  return (Number(BigInt(base)) / 10 ** ASSET_DECIMALS[asset]).toFixed(2);
+interface Playable {
+  asset: Asset;
+  available: string;
+  locked: string;
 }
-
-interface WireBalance {
+interface WalletBal {
   asset: Asset;
   amount: string;
 }
 
+/** Compact 2-decimal amount from base units. */
+function fmt(asset: Asset, base: string): string {
+  return (Number(BigInt(base)) / 10 ** ASSET_DECIMALS[asset]).toFixed(2);
+}
+
 /**
- * Shows the player's CONNECTED WALLET on-chain SOL + USDC (not their in-app
- * deposited balance). Self-fetching so it never blocks server rendering of the
- * nav; refreshes on an interval.
+ * Nav balances. The PRIMARY pill is the player's in-app PLAYABLE balance
+ * (deposited funds) — buy-ins, wins, and losses move this, so a wagered buy-in
+ * visibly draws it down. The secondary "Wallet" chip is the on-chain balance in
+ * their connected wallet (only deposits/withdrawals change it). Self-fetching +
+ * polled so play activity shows without a page refresh.
  */
 export function WalletBalancePill() {
-  const [balances, setBalances] = useState<WireBalance[] | null>(null);
+  const [playable, setPlayable] = useState<Playable[] | null>(null);
+  const [wallet, setWallet] = useState<WalletBal[]>([]);
   const [hasWallet, setHasWallet] = useState(true);
 
   useEffect(() => {
@@ -32,47 +40,82 @@ export function WalletBalancePill() {
         if (!res.ok) return;
         const json = (await res.json()) as {
           address: string | null;
-          balances?: WireBalance[];
+          playable?: Playable[];
+          wallet?: WalletBal[];
         };
         if (!alive) return;
         setHasWallet(json.address != null);
-        setBalances(json.balances ?? []);
+        setPlayable(json.playable ?? []);
+        setWallet(json.wallet ?? []);
       } catch {
-        /* leave the last good values in place */
+        /* keep the last good values */
       }
     }
     load();
-    const id = setInterval(load, 45_000);
+    const id = setInterval(load, 10_000);
     return () => {
       alive = false;
       clearInterval(id);
     };
   }, []);
 
-  if (!hasWallet) return null;
-
-  const shown: WireBalance[] =
-    balances ?? [
-      { asset: "SOL", amount: "0" },
-      { asset: "USDC", amount: "0" },
-    ];
+  const playableShown = (playable ?? []).filter(
+    (b) => BigInt(b.available) > 0n || BigInt(b.locked) > 0n,
+  );
+  const walletShown = wallet.filter((b) => BigInt(b.amount) > 0n);
 
   return (
     <div className="flex items-center gap-2">
-      {shown.map((b) => (
-        <div
-          key={b.asset}
-          className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5"
-          title={`Your connected wallet ${ASSET_SYMBOLS[b.asset]} balance`}
-        >
-          <span className="text-xs font-medium text-velvet">
-            {ASSET_SYMBOLS[b.asset]}
-          </span>
-          <span className="font-mono text-sm text-ivory">
-            {balances ? shortBalance(b.asset, b.amount) : "…"}
-          </span>
+      {/* Playable (in-app) — the chips you actually play with. */}
+      {playable === null ? (
+        <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 font-mono text-sm text-ash">
+          …
         </div>
-      ))}
+      ) : playableShown.length === 0 ? (
+        <div
+          className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 font-mono text-sm text-ash"
+          title="Your playable balance. Deposit on the Cashier to play."
+        >
+          0.00
+        </div>
+      ) : (
+        playableShown.map((b) => (
+          <div
+            key={b.asset}
+            className="flex items-center gap-1.5 rounded-full border border-velvet/30 bg-velvet/[0.08] px-3 py-1.5"
+            title={`Playable ${ASSET_SYMBOLS[b.asset]} (deposited). Buy-ins draw from this.`}
+          >
+            <span className="text-xs font-medium text-velvet">
+              {ASSET_SYMBOLS[b.asset]}
+            </span>
+            <span className="font-mono text-sm text-ivory">
+              {fmt(b.asset, b.available)}
+            </span>
+            {BigInt(b.locked) > 0n && (
+              <span className="font-mono text-[11px] text-ash">
+                +{fmt(b.asset, b.locked)} in play
+              </span>
+            )}
+          </div>
+        ))
+      )}
+
+      {/* Wallet (on-chain) — what's in the connected wallet; deposits move this. */}
+      {hasWallet && walletShown.length > 0 && (
+        <div
+          className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 sm:flex"
+          title="Your connected wallet (on-chain). Deposit on the Cashier to play with it."
+        >
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-ash/70">
+            Wallet
+          </span>
+          {walletShown.map((b) => (
+            <span key={b.asset} className="font-mono text-xs text-ash">
+              {fmt(b.asset, b.amount)} {ASSET_SYMBOLS[b.asset]}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
