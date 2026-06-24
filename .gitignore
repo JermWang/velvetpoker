@@ -53,3 +53,5 @@ yarn-error.log*
 wallets.local.txt
 .treasury.tmp
 .treasury-secret.txt
+
+.vercel

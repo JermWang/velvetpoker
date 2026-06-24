@@ -26,13 +26,15 @@ export function BuyInPanel({
   asset: Asset;
   minBuyIn: bigint;
   maxBuyIn: bigint;
-  onBuyIn: (amount: string, password?: string) => void;
+  onBuyIn: (amount: string, password?: string) => void | Promise<void>;
   demo?: boolean;
   requiresPassword?: boolean;
 }) {
   const [amount, setAmount] = useState(formatAmount(asset, minBuyIn));
   const [password, setPassword] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const sym = ASSET_SYMBOLS[asset];
 
   // Free play: no amount, no SOL/ledger language — just grab a free stack.
@@ -79,26 +81,51 @@ export function BuyInPanel({
           {amount} <span className="text-velvet">{sym}</span>
         </p>
         <p className="mt-3 text-sm leading-relaxed text-ash">
-          This is real money. {amount} {sym} moves from your playable balance to
-          the table — you can cash out your remaining stack any time you&apos;re not
-          in a hand.
+          This is real money. {amount} {sym} moves to the table. If your playable
+          balance is short, you&apos;ll approve a wallet transfer to top it up
+          first — you can cash out your remaining stack any time you&apos;re not in
+          a hand.
         </p>
+        {busy && (
+          <p className="mt-4 text-xs leading-relaxed text-ash">
+            Approve the transfer in your wallet, then hold tight while it confirms
+            on-chain.
+          </p>
+        )}
+        {submitError && (
+          <p className="mt-4 text-xs leading-relaxed text-red-300">{submitError}</p>
+        )}
         <div className="mt-5 flex gap-2">
           <Button
             variant="ghost"
             className="flex-1"
-            onClick={() => setConfirming(false)}
+            disabled={busy}
+            onClick={() => {
+              setSubmitError(null);
+              setConfirming(false);
+            }}
           >
             Cancel
           </Button>
           <Button
             className="flex-1"
-            onClick={() => {
-              onBuyIn(amount, requiresPassword ? password : undefined);
-              setConfirming(false);
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setSubmitError(null);
+              try {
+                await onBuyIn(amount, requiresPassword ? password : undefined);
+                setConfirming(false);
+              } catch (e) {
+                setSubmitError(
+                  e instanceof Error ? e.message : "Could not complete the buy-in.",
+                );
+              } finally {
+                setBusy(false);
+              }
             }}
           >
-            Confirm &amp; sit
+            {busy ? "Confirming…" : "Confirm & sit"}
           </Button>
         </div>
       </div>

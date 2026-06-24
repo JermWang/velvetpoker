@@ -25,6 +25,47 @@ import { Button } from "@/components/ui/button";
 import { ConnectButton } from "@/components/auth/connect-button";
 import { useNavCollapsed } from "@/components/app-shell/app-chrome";
 import { cn } from "@/lib/utils";
+import { authedFetch } from "@/lib/auth/privy-token";
+import {
+  canDepositFromWallet,
+  depositSolFromWallet,
+} from "@/lib/solana/wallet-deposit";
+
+/** The player's in-app PLAYABLE (available) balance for an asset, in base units. */
+async function fetchPlayableAvailable(asset: Asset): Promise<bigint> {
+  const res = await authedFetch("/api/wallet/balances");
+  if (!res.ok) return 0n;
+  const json = (await res.json()) as {
+    playable?: { asset: Asset; available: string }[];
+  };
+  const row = (json.playable ?? []).find((p) => p.asset === asset);
+  return row ? BigInt(row.available) : 0n;
+}
+
+/**
+ * Poll the deposit scanner + balance until a just-signed wallet deposit credits
+ * (it needs on-chain confirmations first). Throws if it hasn't credited in time
+ * — the funds are safe in the treasury and will credit on the next scan.
+ */
+async function waitForCredit(
+  asset: Asset,
+  target: bigint,
+  timeoutMs = 60_000,
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      await authedFetch("/api/cashier/scan-deposits", { method: "POST" });
+    } catch {
+      /* transient — keep polling */
+    }
+    if ((await fetchPlayableAvailable(asset)) >= target) return;
+    await new Promise((r) => setTimeout(r, 2500));
+  }
+  throw new Error(
+    "Your deposit is still confirming on-chain. Give it a few seconds, then tap Buy in again.",
+  );
+}
 
 export interface PokerTableViewProps {
   tableId: string;
@@ -221,25 +262,40 @@ export function PokerTableView(props: PokerTableViewProps) {
     });
   }
 
-  function buyIn(amount: string, password?: string, seatNumber?: number) {
+  async function buyIn(amount: string, password?: string, seatNumber?: number) {
+    let lamports: bigint;
     try {
-      const lamports = parseAmount(props.asset, amount);
-      send({
-        t: "BUY_IN",
-        tableId: props.tableId,
-        amount: lamports.toString(),
-        ...(password ? { password } : {}),
-        ...(seatNumber != null ? { seatNumber } : {}),
-      });
+      lamports = parseAmount(props.asset, amount);
     } catch {
-      /* ignore parse errors; the field guides format */
+      return; /* the field guides format */
     }
+    // Frictionless top-up: if the in-app playable balance is short, pull the
+    // shortfall straight from the connected wallet (Phantom popup), wait for it
+    // to credit, then sit — no Cashier round-trip. SOL real-money tables only
+    // for now; demo + token (public) tables fall straight through to the ledger
+    // buy-in. Any failure here propagates to the BuyInPanel, which surfaces it
+    // and does NOT seat the player.
+    if (!props.demo && props.asset === "SOL" && canDepositFromWallet()) {
+      const available = await fetchPlayableAvailable(props.asset);
+      const shortfall = lamports - available;
+      if (shortfall > 0n) {
+        await depositSolFromWallet(shortfall);
+        await waitForCredit(props.asset, lamports);
+      }
+    }
+    send({
+      t: "BUY_IN",
+      tableId: props.tableId,
+      amount: lamports.toString(),
+      ...(password ? { password } : {}),
+      ...(seatNumber != null ? { seatNumber } : {}),
+    });
   }
 
   // Free play: tap an open seat to sit straight down with a free stack — no
   // module, no amount to pick.
   function sitFree(seatNumber: number) {
-    buyIn(formatAmount(props.asset, BigInt(props.maxBuyIn)), undefined, seatNumber);
+    void buyIn(formatAmount(props.asset, BigInt(props.maxBuyIn)), undefined, seatNumber);
   }
 
   function toggleSitOut() {
