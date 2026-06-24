@@ -20,6 +20,7 @@ import { PlayingCard } from "./playing-card";
 import { ActionBar } from "./action-bar";
 import { BuyInPanel } from "./buy-in-panel";
 import { VerifyHandDrawer } from "./verify-hand-drawer";
+import { PrivateInviteBar } from "./private-invite-bar";
 import { Button } from "@/components/ui/button";
 import { ConnectButton } from "@/components/auth/connect-button";
 import { useNavCollapsed } from "@/components/app-shell/app-chrome";
@@ -43,6 +44,8 @@ export interface PokerTableViewProps {
   requiresPassword?: boolean;
   /** LiveKit configured — enables the table voice/video controls. */
   voiceEnabled?: boolean;
+  /** Set on a PRIVATE table → shows the copy-invite-link bar above the felt. */
+  inviteCode?: string | null;
 }
 
 /** The branded velvet poker chip (black + gold "V"), from /public. */
@@ -344,6 +347,9 @@ export function PokerTableView(props: PokerTableViewProps) {
   // everything else is compact, so the page itself never scrolls.
   return (
     <div className="flex h-[calc(100dvh-6.5rem)] flex-col gap-2.5">
+      {props.inviteCode ? (
+        <PrivateInviteBar tableId={props.tableId} inviteCode={props.inviteCode} />
+      ) : null}
       {/* Phones: nudge to landscape (the table plays far better wide). */}
       <RotatePrompt />
       {/* Compact header */}

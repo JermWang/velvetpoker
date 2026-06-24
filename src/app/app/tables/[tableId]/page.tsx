@@ -122,6 +122,7 @@ export default async function TablePage({
       authQuery={userAuthQuery}
       youUserId={user.id}
       requiresPassword={table.visibility === "PRIVATE" && Boolean(table.passwordHash)}
+      inviteCode={table.visibility === "PRIVATE" ? table.inviteCode : null}
       voiceEnabled={voiceEnabled}
     />
   );
