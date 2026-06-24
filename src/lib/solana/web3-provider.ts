@@ -241,11 +241,34 @@ export class Web3SolanaProvider implements SolanaProvider {
     const to = new PublicKey(params.toAddress);
 
     if (params.asset === "SOL") {
-      const tx = new Transaction().add(
+      // The withdrawer pays their own network fee: deduct it from the amount sent
+      // so the treasury's total on-chain outflow equals exactly the requested
+      // amount. No operator gas subsidy, and no SOL buffer beyond user balances
+      // is required for SOL cash-outs (treasury asset down == user liability down).
+      const { blockhash } = await this.connection.getLatestBlockhash();
+      const probe = new Transaction({
+        feePayer: this.hotWallet.publicKey,
+        recentBlockhash: blockhash,
+      }).add(
         SystemProgram.transfer({
           fromPubkey: this.hotWallet.publicKey,
           toPubkey: to,
           lamports: params.amount,
+        }),
+      );
+      const feeResp = await this.connection.getFeeForMessage(probe.compileMessage());
+      const fee = BigInt(feeResp.value ?? 5000);
+      const sendLamports = params.amount - fee;
+      if (sendLamports <= 0n) {
+        throw new Error(
+          `Withdrawal amount (${params.amount} lamports) is too small to cover the network fee (${fee} lamports)`,
+        );
+      }
+      const tx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: this.hotWallet.publicKey,
+          toPubkey: to,
+          lamports: sendLamports,
         }),
       );
       const sig = await sendAndConfirmTransaction(this.connection, tx, [
