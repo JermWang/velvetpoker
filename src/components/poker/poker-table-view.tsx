@@ -22,6 +22,7 @@ import { BuyInPanel } from "./buy-in-panel";
 import { VerifyHandDrawer } from "./verify-hand-drawer";
 import { Button } from "@/components/ui/button";
 import { ConnectButton } from "@/components/auth/connect-button";
+import { useNavCollapsed } from "@/components/app-shell/app-chrome";
 import { cn } from "@/lib/utils";
 
 export interface PokerTableViewProps {
@@ -195,6 +196,10 @@ export function PokerTableView(props: PokerTableViewProps) {
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
   useTurnAlert(isYourTurn, muted);
 
+  // When the player collapses the left nav, hand the freed width to the chat /
+  // hand-history column (desktop only — mobile/landscape have their own layout).
+  const navCollapsed = useNavCollapsed();
+
   // Table voice/video (LiveKit). Opt-in — connects only when the player taps
   // "Join voice". Gated to signed-in players at a voice-enabled table.
   const voiceAvailable = !!props.voiceEnabled && props.youUserId != null;
@@ -356,17 +361,18 @@ export function PokerTableView(props: PokerTableViewProps) {
             {muted ? "🔇" : "🔊"}
           </button>
 
-          {/* Table voice/video (opt-in) */}
+          {/* Table voice/video (opt-in) — kept prominent so players notice the
+              mic + camera are available at the table. */}
           {voiceAvailable && media.status !== "on" && (
             <Button
               size="sm"
-              variant="ghost"
-              className="whitespace-nowrap px-2 text-xs"
+              variant="secondary"
+              className="whitespace-nowrap gap-1.5 border border-velvet/45 px-3 text-xs font-semibold"
               onClick={() => media.join()}
               disabled={media.status === "connecting"}
-              title="Join table voice & video"
+              title="Turn on table voice & video chat"
             >
-              {media.status === "connecting" ? "Joining…" : "🎙 Join voice"}
+              {media.status === "connecting" ? "Joining…" : "🎙 Voice & video"}
             </Button>
           )}
           {voiceAvailable && media.status === "on" && (
@@ -375,36 +381,38 @@ export function PokerTableView(props: PokerTableViewProps) {
                 type="button"
                 onClick={() => media.toggleMic()}
                 aria-label={media.micOn ? "Mute microphone" : "Unmute microphone"}
-                title={media.micOn ? "Mic on" : "Mic off"}
+                title={media.micOn ? "Mic on — click to mute" : "Mic off — click to unmute"}
                 className={cn(
-                  "grid h-7 w-7 place-items-center rounded-full border text-sm transition-colors",
+                  "flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors",
                   media.micOn
-                    ? "border-velvet/50 bg-velvet/20 text-ivory"
+                    ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200"
                     : "border-white/10 bg-white/5 text-ash hover:text-ivory",
                 )}
               >
-                {media.micOn ? "🎙" : "🔇"}
+                <span className="text-sm">{media.micOn ? "🎙" : "🔇"}</span>
+                <span className="hidden md:inline">{media.micOn ? "Mic" : "Muted"}</span>
               </button>
               <button
                 type="button"
                 onClick={() => media.toggleCam()}
                 aria-label={media.camOn ? "Turn camera off" : "Turn camera on"}
-                title={media.camOn ? "Camera on" : "Camera off"}
+                title={media.camOn ? "Camera on — click to turn off" : "Camera off — click to turn on"}
                 className={cn(
-                  "grid h-7 w-7 place-items-center rounded-full border text-sm transition-colors",
+                  "flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors",
                   media.camOn
-                    ? "border-velvet/50 bg-velvet/20 text-ivory"
+                    ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200"
                     : "border-white/10 bg-white/5 text-ash hover:text-ivory",
                 )}
               >
-                {media.camOn ? "📹" : "📷"}
+                <span className="text-sm">{media.camOn ? "📹" : "📷"}</span>
+                <span className="hidden md:inline">{media.camOn ? "Cam" : "Cam off"}</span>
               </button>
               <button
                 type="button"
                 onClick={() => media.leave()}
                 aria-label="Leave table voice"
-                title="Leave voice"
-                className="grid h-7 w-7 place-items-center rounded-full border border-red-400/30 bg-red-400/10 text-sm text-red-200 transition-colors hover:bg-red-400/20"
+                title="Leave voice & video"
+                className="grid h-8 w-8 place-items-center rounded-full border border-red-400/30 bg-red-400/10 text-sm text-red-200 transition-colors hover:bg-red-400/20"
               >
                 ✕
               </button>
@@ -565,11 +573,15 @@ export function PokerTableView(props: PokerTableViewProps) {
               seatCount,
               isMobile,
             );
-            // Push the bet chip well in toward the table center so it sits on
-            // open felt between the player's pod and the board — never on top of
-            // the name/stack pill (worst on the top seats, whose pod extends in).
-            const bx = pos.x + (50 - pos.x) * 0.52;
-            const by = pos.y + (50 - pos.y) * 0.52;
+            // Place the bet chip on open felt between the pod and the board.
+            // Seats out on the sides sit far from center, so a deep inset leaves
+            // their chip drifting toward midfield — pull it back closer to the
+            // pod so it clearly belongs to that player. Top/bottom seats keep the
+            // deeper inset that clears their name/stack pill.
+            const isSide = Math.abs(pos.x - 50) > 25;
+            const inset = isSide ? 0.34 : 0.52;
+            const bx = pos.x + (50 - pos.x) * inset;
+            const by = pos.y + (50 - pos.y) * inset;
             return (
               <div
                 key={`bet-${s.seat}`}
@@ -701,7 +713,13 @@ export function PokerTableView(props: PokerTableViewProps) {
             portrait phones; a fixed, internally-scrollable column on the right in
             landscape and from lg up (so the controls are always reachable even on
             short landscape-phone viewports). */}
-        <aside className="flex min-h-0 shrink-0 flex-col gap-2.5 overflow-y-auto landscape:w-[300px] lg:w-[340px]">
+        <aside
+          className={cn(
+            "flex min-h-0 shrink-0 flex-col gap-2.5 overflow-y-auto overflow-x-hidden landscape:w-[300px]",
+            // Collapsing the left nav widens the chat / hand-history column.
+            navCollapsed ? "lg:w-[440px]" : "lg:w-[340px]",
+          )}
+        >
         {/* Action / buy-in */}
         <div className="shrink-0">
         {isSpectator ? (
@@ -872,7 +890,7 @@ export function PokerTableView(props: PokerTableViewProps) {
               <p className="text-xs text-ash/60">No messages yet.</p>
             ) : (
               state.chat.map((m, i) => (
-                <p key={i} className="text-ash">
+                <p key={i} className="break-words text-ash">
                   <span className="text-ivory">{m.from}:</span> {m.message}
                 </p>
               ))
@@ -906,7 +924,7 @@ export function PokerTableView(props: PokerTableViewProps) {
                 setChatOpen(true);
                 setHistoryOpen(false);
               }}
-              className="flex flex-1 items-center gap-2"
+              className="flex min-w-0 flex-1 items-center gap-2"
             >
               <button
                 type="button"
@@ -924,9 +942,9 @@ export function PokerTableView(props: PokerTableViewProps) {
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder="Say something…"
-                className="h-9 flex-1 rounded-lg border border-white/10 bg-charcoal-900/60 px-3 text-sm text-ivory placeholder:text-ash/50 focus:outline-none"
+                className="h-9 min-w-0 flex-1 rounded-lg border border-white/10 bg-charcoal-900/60 px-3 text-sm text-ivory placeholder:text-ash/50 focus:outline-none"
               />
-              <Button size="sm" variant="secondary" type="submit">
+              <Button size="sm" variant="secondary" type="submit" className="shrink-0">
                 Send
               </Button>
             </form>

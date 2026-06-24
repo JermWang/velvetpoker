@@ -1,7 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+
+/**
+ * Whether the desktop nav is currently collapsed. The table view reads this to
+ * hand the freed width to the chat / hand-history panel for players who've
+ * collapsed the menu to focus on their table.
+ */
+const NavCollapsedContext = createContext(false);
+export function useNavCollapsed(): boolean {
+  return useContext(NavCollapsedContext);
+}
 
 /**
  * App shell with a collapsible nav. Desktop: the sidebar is in-flow and the
@@ -72,13 +82,17 @@ export function AppChrome({
             open && "translate-x-0",
             // Desktop: in-flow, collapsible width, no drawer chrome.
             "md:static md:z-auto md:translate-x-0 md:border-0 md:bg-transparent md:px-0 md:pt-0",
-            open ? "md:w-52 md:opacity-100" : "md:w-0 md:overflow-hidden md:opacity-0",
+            open ? "md:w-44 md:opacity-100" : "md:w-0 md:overflow-hidden md:opacity-0",
           )}
         >
           <div className="md:sticky md:top-24">{sidebar}</div>
         </aside>
 
-        <main className="min-w-0 flex-1">{children}</main>
+        <main className="min-w-0 flex-1">
+          <NavCollapsedContext.Provider value={!open}>
+            {children}
+          </NavCollapsedContext.Provider>
+        </main>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { Input, Label } from "@/components/ui/input";
 import { initials } from "@/lib/utils";
 import { authedFetch } from "@/lib/auth/privy-token";
 import { AvatarCropper } from "./avatar-cropper";
+import { NftPicker } from "./nft-picker";
 
 export function ProfileCard({
   displayName,
@@ -23,6 +24,7 @@ export function ProfileCard({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null);
+  const [nftOpen, setNftOpen] = useState(false);
 
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -120,17 +122,40 @@ export function ProfileCard({
             className="hidden"
             onChange={onPick}
           />
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => fileRef.current?.click()}
-            disabled={busy === "avatar"}
-          >
-            {busy === "avatar" ? "Uploading…" : preview ? "Change photo" : "Upload photo"}
-          </Button>
-          <p className="mt-1 text-xs text-ash/70">PNG, JPG or WebP. Square works best.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => fileRef.current?.click()}
+              disabled={busy === "avatar"}
+            >
+              {busy === "avatar" ? "Uploading…" : preview ? "Change photo" : "Upload photo"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setNftOpen(true)}
+              disabled={busy === "avatar"}
+            >
+              Choose NFT
+            </Button>
+          </div>
+          <p className="mt-1 text-xs text-ash/70">
+            Upload an image, or pick a verified NFT from your wallet.
+          </p>
         </div>
       </div>
+
+      {nftOpen && (
+        <NftPicker
+          onClose={() => setNftOpen(false)}
+          onPicked={(url) => {
+            setPreview(url);
+            setNftOpen(false);
+            router.refresh();
+          }}
+        />
+      )}
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="grow">
