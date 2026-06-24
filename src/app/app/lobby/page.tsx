@@ -5,6 +5,7 @@ import { JoinPrivate } from "@/components/lobby/join-private";
 import { Button } from "@/components/ui/button";
 import { getAssetPrices } from "@/lib/pricing/prices";
 import { env } from "@/lib/env";
+import { ContractAddressChip } from "@/components/app-shell/contract-address";
 
 // Public cash games are wagered in the house token; show it on the card pill.
 // Falls back to the brand ticker until NEXT_PUBLIC_TOKEN_SYMBOL is configured.
@@ -45,6 +46,9 @@ export default async function LobbyPage() {
 
   return (
     <div className="space-y-10 py-2">
+      {/* Token contract address — click-to-copy, prominent at the very top. */}
+      <ContractAddressChip />
+
       {/* Private-room banner — the house specialty. */}
       <div className="glass glass-velvet relative overflow-hidden p-7">
         <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-velvet/10 blur-3xl" />

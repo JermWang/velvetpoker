@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { ContractAddressChip } from "@/components/app-shell/contract-address";
 
 const nav = [
   { href: "/app", label: "Overview", hint: "Your dashboard — balances and quick links." },
@@ -45,6 +46,10 @@ export function Sidebar() {
           </Link>
         );
       })}
+      {/* Token CA — mobile nav drawer only (desktop carries it in the header). */}
+      <div className="mt-3 border-t border-white/8 pt-3 md:hidden">
+        <ContractAddressChip compact />
+      </div>
     </nav>
   );
 }

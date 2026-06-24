@@ -5,6 +5,7 @@ import { AppChrome } from "@/components/app-shell/app-chrome";
 import { WalletBalancePill } from "@/components/app-shell/wallet-balance-pill";
 import { AccountMenu } from "@/components/app-shell/account-menu";
 import { ConnectButton } from "@/components/auth/connect-button";
+import { ContractAddressChip } from "@/components/app-shell/contract-address";
 
 export default async function AppLayout({
   children,
@@ -22,6 +23,11 @@ export default async function AppLayout({
       sidebar={<Sidebar />}
       headerRight={
         <div className="flex items-center gap-3 sm:gap-4">
+          {/* Token CA — desktop nav. Hidden on phones (the lobby bar + the menu
+              drawer carry it there) so the header never clusters. */}
+          <div className="hidden md:block">
+            <ContractAddressChip compact />
+          </div>
           {user ? (
             <>
               <WalletBalancePill />
