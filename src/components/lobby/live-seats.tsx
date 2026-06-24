@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-const SUIT = "♠";
-
 /** ws:// → http:// , wss:// → https:// (the occupancy endpoint shares the port). */
 function occupancyUrl(): string | null {
   const ws = process.env.NEXT_PUBLIC_WS_URL ?? "";
@@ -74,12 +72,13 @@ export function LiveSeats({
         {seats.map((filled, i) => (
           <span
             key={i}
-            className={`grid h-5 w-5 place-items-center rounded-full border border-white/70 text-[10px] ${
-              filled ? "bg-velvet/15 text-velvet" : "text-ash/40"
+            title={filled ? "Seat taken" : "Open seat"}
+            className={`h-5 w-5 rounded-full border ${
+              filled
+                ? "border-velvet bg-velvet shadow-[0_0_8px_rgba(143,29,44,0.55)]"
+                : "border-white/25 bg-transparent"
             }`}
-          >
-            {filled ? SUIT : ""}
-          </span>
+          />
         ))}
       </div>
     </div>
