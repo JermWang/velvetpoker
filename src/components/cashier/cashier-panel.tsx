@@ -12,11 +12,14 @@ export function CashierPanel({
   canPlay,
   tokenConfigured,
   tokenSymbol,
+  connectedWallet,
   available,
 }: {
   canPlay: boolean;
   tokenConfigured: boolean;
   tokenSymbol: string;
+  /** The player's connected Solana wallet — the one-click withdraw destination. */
+  connectedWallet: string | null;
   /** Available (withdrawable) balance per asset, as decimal strings. */
   available: Array<{ asset: string; amount: string }>;
 }) {
@@ -27,6 +30,9 @@ export function CashierPanel({
   const [addrError, setAddrError] = useState<string | null>(null);
   const [wAsset, setWAsset] = useState("SOL");
   const [wAmount, setWAmount] = useState("");
+  // Default the destination to the player's own connected wallet so they never
+  // have to paste an address (the #1 source of withdrawal mistakes).
+  const [wTo, setWTo] = useState(connectedWallet ?? "");
   const [wSubmitting, setWSubmitting] = useState(false);
   const [wMessage, setWMessage] = useState<string | null>(null);
   const [wError, setWError] = useState<string | null>(null);
@@ -66,14 +72,13 @@ export function CashierPanel({
     setWSubmitting(true);
     setWError(null);
     setWMessage(null);
-    const form = new FormData(e.currentTarget);
     const res = await authedFetch("/api/cashier/withdraw", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         asset: wAsset,
         amount: wAmount,
-        toAddress: String(form.get("toAddress") ?? ""),
+        toAddress: wTo.trim(),
       }),
     });
     const json = await res.json();
@@ -194,13 +199,32 @@ export function CashierPanel({
               />
             </div>
             <div>
-              <Label htmlFor="toAddress">Destination address</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="toAddress">Destination address</Label>
+                {connectedWallet && (
+                  <button
+                    type="button"
+                    onClick={() => setWTo(connectedWallet)}
+                    className="rounded border border-white/12 px-1.5 py-px text-[10px] text-velvet hover:text-ivory"
+                    title={connectedWallet}
+                  >
+                    Use connected wallet
+                  </button>
+                )}
+              </div>
               <Input
                 id="toAddress"
                 name="toAddress"
                 placeholder="Solana address"
+                value={wTo}
+                onChange={(e) => setWTo(e.target.value)}
                 required
               />
+              {connectedWallet && wTo === connectedWallet && (
+                <p className="mt-1 text-[11px] text-ash/70">
+                  Sending to your connected wallet.
+                </p>
+              )}
             </div>
             {wError && <p className="text-sm text-red-300">{wError}</p>}
             {wMessage && <p className="text-sm text-emerald-300">{wMessage}</p>}

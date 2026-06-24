@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CashierPage() {
   const user = await requireUser();
-  const [balances, deposits, withdrawals] = await Promise.all([
+  const [balances, deposits, withdrawals, wallet] = await Promise.all([
     getUserBalances(user.id),
     prisma.deposit.findMany({
       where: { userId: user.id },
@@ -24,6 +24,10 @@ export default async function CashierPage() {
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       take: 5,
+    }),
+    prisma.wallet.findFirst({
+      where: { userId: user.id, chain: "SOLANA" },
+      orderBy: { createdAt: "asc" },
     }),
   ]);
 
@@ -51,6 +55,7 @@ export default async function CashierPage() {
         canPlay={canPlayRealMoney(user)}
         tokenConfigured={isTokenConfigured()}
         tokenSymbol={env.tokenSymbol}
+        connectedWallet={wallet?.address ?? null}
         available={balances.map((b) => ({
           asset: b.asset,
           amount: formatAmount(b.asset, b.available),
