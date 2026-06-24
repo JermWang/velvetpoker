@@ -280,17 +280,47 @@ export function PokerTableView(props: PokerTableViewProps) {
   const seatCount = table?.seats.length ?? 0;
   const heroSlotAnchor = 0;
 
+  // All-in run-out drama: when a full 5-card board lands at once (appearing from
+  // <=3 shown cards — only an all-in does that; a normal river is 4->5), reveal
+  // it street-by-street and hold the result until it finishes. Purely visual —
+  // the deal + settlement already happened server-side, so fairness is untouched.
+  const boardLen = table?.community.length ?? 0;
+  const [dealtBoard, setDealtBoard] = useState(0);
+  const runoutRef = useRef(false);
+  useEffect(() => {
+    if (boardLen <= dealtBoard) {
+      runoutRef.current = false;
+      if (boardLen !== dealtBoard) setDealtBoard(boardLen); // new hand / reset
+      return;
+    }
+    if (!runoutRef.current) {
+      if (boardLen === 5 && dealtBoard <= 3) runoutRef.current = true;
+      else {
+        setDealtBoard(boardLen); // normal street — show immediately
+        return;
+      }
+    }
+    // In a run-out: flop lands together, then the turn, then the river — each
+    // after a beat — so the cards roll out instead of snapping to the result.
+    const nextStop = dealtBoard < 3 ? 3 : dealtBoard + 1;
+    const t = setTimeout(() => setDealtBoard(Math.min(nextStop, boardLen)), 850);
+    return () => clearTimeout(t);
+  }, [boardLen, dealtBoard]);
+  const revealComplete = dealtBoard >= boardLen;
+
   // Showdown reveals: map each shown seat -> its hole cards + hand rank. Server
   // only sends cards for a contested showdown, so uncontested wins reveal none.
+  // Held back until the run-out board has finished landing (revealComplete).
   const showdownBySeat = useMemo(() => {
     const m = new Map<number, { cards: Card[]; handDescription: string }>();
+    if (!revealComplete) return m;
     for (const r of state.lastShowdown?.results ?? []) {
       if (r.cards && r.cards.length > 0) {
         m.set(r.seat, { cards: r.cards, handDescription: r.handDescription });
       }
     }
     return m;
-  }, [state.lastShowdown]);
+  }, [state.lastShowdown, revealComplete]);
 
   // You won a pot UNCONTESTED (everyone folded → your result has winnings but no
   // revealed cards): offer to optionally show or keep your hand hidden, until you
@@ -300,6 +330,7 @@ export function PokerTableView(props: PokerTableViewProps) {
       ? state.lastShowdown?.results.find((r) => r.seat === yourSeat.seat)
       : undefined;
   const canOfferShow =
+    revealComplete &&
     yourSeat != null &&
     state.lastShowdown != null &&
     myShowdownResult != null &&
@@ -537,9 +568,9 @@ export function PokerTableView(props: PokerTableViewProps) {
 
           {/* Center — board + pot */}
           <div className="absolute inset-x-[10%] inset-y-[24%] flex flex-col items-center justify-center gap-2 sm:inset-x-[16%] sm:inset-y-[30%] sm:gap-3">
-            {table && table.community.length > 0 ? (
+            {table && dealtBoard > 0 ? (
               <div className="flex origin-center scale-[0.5] items-center justify-center gap-1.5 min-[420px]:scale-[0.62] sm:scale-100 sm:gap-2">
-                {table.community.map((c) => (
+                {table.community.slice(0, dealtBoard).map((c) => (
                   <PlayingCard key={c} card={c} size="lg" />
                 ))}
               </div>
@@ -608,7 +639,9 @@ export function PokerTableView(props: PokerTableViewProps) {
             const winResult = state.lastShowdown?.results.find(
               (r) => r.seat === s.seat && BigInt(r.amountWon) > 0n,
             );
-            const winAmt = winResult ? BigInt(winResult.amountWon) : null;
+            // Hold the win flourish until the run-out board has finished landing.
+            const winAmt =
+              revealComplete && winResult ? BigInt(winResult.amountWon) : null;
             return (
               <div
                 key={s.seat}
@@ -671,7 +704,7 @@ export function PokerTableView(props: PokerTableViewProps) {
 
           {/* Showdown — overlaid at the top: winners first, then losing hands,
               by name (not seat number), so the result reads at a glance. */}
-          {state.lastShowdown &&
+          {state.lastShowdown && revealComplete &&
             (() => {
               const nameFor = (seat: number) =>
                 table?.seats.find((s) => s.seat === seat)?.displayName ??
