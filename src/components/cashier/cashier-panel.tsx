@@ -89,8 +89,8 @@ export function CashierPanel({
     }
     setWMessage(
       json.requiresReview
-        ? "Withdrawal submitted for review. Larger amounts are reviewed before sending."
-        : "Withdrawal approved and queued for sending.",
+        ? "Withdrawal submitted — it'll be reviewed, then sent on-chain. Track its status in your history below."
+        : "Withdrawal requested — sending on-chain now. Track its status in your history below; a Solscan link appears once it lands (and it's auto-refunded if a send ever fails).",
     );
     router.refresh();
   }
