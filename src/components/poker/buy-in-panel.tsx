@@ -23,6 +23,7 @@ export function BuyInPanel({
 }) {
   const [amount, setAmount] = useState(formatAmount(asset, minBuyIn));
   const [password, setPassword] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const sym = ASSET_SYMBOLS[asset];
 
   // Free play: no amount, no SOL/ledger language — just grab a free stack.
@@ -58,6 +59,43 @@ export function BuyInPanel({
   }
   const canBuy = !amountError && (!requiresPassword || password.length > 0);
 
+  // Explicit sign-off so a real-money buy-in is never accidental: the player
+  // sees the exact amount leaving their balance and confirms before sitting.
+  if (confirming && parsed !== null && !amountError) {
+    return (
+      <div className="card-surface mx-auto max-w-sm p-6 text-center">
+        <h3 className="font-display text-lg text-ivory">Confirm buy-in</h3>
+        <p className="mt-3 text-sm text-ash">You&apos;re about to sit down with</p>
+        <p className="mt-1 font-mono text-3xl text-ivory">
+          {amount} <span className="text-velvet">{sym}</span>
+        </p>
+        <p className="mt-3 text-sm leading-relaxed text-ash">
+          This is real money. {amount} {sym} moves from your playable balance to
+          the table — you can cash out your remaining stack any time you&apos;re not
+          in a hand.
+        </p>
+        <div className="mt-5 flex gap-2">
+          <Button
+            variant="ghost"
+            className="flex-1"
+            onClick={() => setConfirming(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            className="flex-1"
+            onClick={() => {
+              onBuyIn(amount, requiresPassword ? password : undefined);
+              setConfirming(false);
+            }}
+          >
+            Confirm &amp; sit
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="card-surface mx-auto max-w-sm p-6 text-center">
       <h3 className="font-display text-lg text-ivory">Take a seat</h3>
@@ -92,7 +130,7 @@ export function BuyInPanel({
       <Button
         className="mt-4 w-full"
         disabled={!canBuy}
-        onClick={() => onBuyIn(amount, requiresPassword ? password : undefined)}
+        onClick={() => setConfirming(true)}
       >
         Buy in &amp; sit
       </Button>

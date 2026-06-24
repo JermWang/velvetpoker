@@ -87,7 +87,7 @@ export default function StartScreen() {
       {/* Footer — trust badges, legal links + socials, and the 18+ line grouped
           as ONE block so the three rows share one even vertical gap (the badges
           used to live in the hero, which made the middle row's spacing uneven). */}
-      <footer className="relative z-10 flex w-full max-w-6xl flex-col items-center gap-3.5 pb-4 text-center">
+      <footer className="relative z-10 mt-12 flex w-full max-w-6xl flex-col items-center gap-2 pb-4 text-center">
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[11px] uppercase tracking-[0.22em] text-ash/60">
           <span>Verified RNG</span>
           <span className="text-velvet/40">◆</span>
