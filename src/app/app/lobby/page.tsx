@@ -87,6 +87,12 @@ export default async function LobbyPage() {
           </span>
         </div>
 
+        {/* Public games settle in the house token only. */}
+        <p className="mb-5 inline-block rounded-lg border border-velvet/25 bg-velvet/[0.07] px-3 py-1.5 text-sm text-ivory">
+          Public games are wagered only in{" "}
+          <span className="font-semibold text-velvet">${TOKEN_TAG}</span>.
+        </p>
+
         {data.length === 0 ? (
           <div className="glass p-12 text-center">
             <p className="text-ash">No public tables are open right now.</p>
