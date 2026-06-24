@@ -138,6 +138,10 @@ export class TableRoom {
   /** Seats with a cash-out in flight — guards against a double refund when an
    *  explicit leave and an abandon-timeout race for the same seat. */
   private settling = new Set<string>();
+  // Players who pressed Leave during a live hand: auto-folded the moment it's
+  // their turn, then cashed out + freed once the hand settles (you can't lift a
+  // stack out of a live pot). They keep watching as a spectator meanwhile.
+  private pendingLeave = new Set<string>();
   // The most recent uncontested winner (everyone folded). They may OPTIONALLY
   // reveal their hand via showCards() until the next hand starts. Null otherwise.
   private lastUncontestedWinner: { playerId: string; seat: number; cards: Card[] } | null = null;
@@ -328,6 +332,7 @@ export class TableRoom {
 
   leave(playerId: string): bigint {
     this.cancelBustGrace(playerId);
+    this.pendingLeave.delete(playerId);
     const dt = this.disconnectTimers.get(playerId);
     if (dt) {
       clearTimeout(dt);
@@ -438,6 +443,56 @@ export class TableRoom {
       }
     }
     this.leave(playerId);
+  }
+
+  /**
+   * A player pressed Leave during a live hand. Fold them out (now if it's their
+   * turn, otherwise the instant it becomes their turn — see requestAction) and
+   * queue their seat to be cashed out + freed once the hand settles. They forfeit
+   * the hand (leaving does that anyway) and keep watching as a spectator.
+   */
+  foldAndLeaveAfterHand(playerId: string): void {
+    const seat = this.findSeatByPlayer(playerId);
+    if (!seat) return;
+    this.pendingLeave.add(playerId);
+    seat.sittingOut = true;
+    const toAct =
+      this.hand && !this.hand.isComplete && this.hand.toActSeat != null
+        ? this.hand.seats.find((s) => s.seat === this.hand!.toActSeat)
+        : null;
+    if (toAct && toAct.playerId === playerId) {
+      // Their turn right now — fold immediately so the hand moves on.
+      this.handleAction(playerId, "FOLD");
+    } else {
+      this.broadcastSeats();
+    }
+  }
+
+  /** After a hand settles, cash out + free the seats of anyone who left mid-hand. */
+  private async processPendingLeaves(): Promise<void> {
+    for (const playerId of [...this.pendingLeave]) {
+      this.pendingLeave.delete(playerId);
+      const seat = this.findSeatByPlayer(playerId);
+      if (!seat) continue;
+      const amount = seat.stack;
+      if (amount > 0n && this.onCashOutSeat) {
+        if (!this.beginSettle(playerId)) {
+          this.pendingLeave.add(playerId);
+          continue;
+        }
+        let ok = false;
+        try {
+          ok = await this.onCashOutSeat(playerId, amount);
+        } finally {
+          this.endSettle(playerId);
+        }
+        if (!ok) {
+          this.pendingLeave.add(playerId); // ledger hiccup — retry after next hand
+          continue;
+        }
+      }
+      this.leave(playerId);
+    }
   }
 
   /** Current table stack for a seated player (0 if not seated). */
@@ -840,6 +895,14 @@ export class TableRoom {
     const seat = this.hand.seats.find((s) => s.seat === this.hand!.toActSeat);
     if (!seat) return;
 
+    // A player who pressed Leave mid-hand auto-folds the instant it's their turn
+    // — no waiting on their clock — so the table never stalls on someone who's
+    // already gone (they forfeit, which is the point of leaving).
+    if (this.pendingLeave.has(seat.playerId)) {
+      this.handleAction(seat.playerId, "FOLD");
+      return;
+    }
+
     // Bots have no client to prompt — they act on a short, human-feeling delay.
     if (isBotId(seat.playerId)) {
       const seatNumber = seat.seat;
@@ -1051,12 +1114,18 @@ export class TableRoom {
       }
     }
 
-    void this.onHandSettled?.({
-      handId: hand.handId,
-      deltas,
-      rake,
-      contributions,
-    });
+    // Settle the hand, THEN cash out + free anyone who left mid-hand (their stack
+    // is only final once the deltas are applied). Ordering matters for the ledger.
+    void Promise.resolve(
+      this.onHandSettled?.({
+        handId: hand.handId,
+        deltas,
+        rake,
+        contributions,
+      }),
+    )
+      .then(() => this.processPendingLeaves())
+      .catch((e) => console.error("[room] settle / pending-leave error", e));
 
     // Persist final Hand state, results, actions, and reveal the server seed.
     void this.onHandCompleted?.({

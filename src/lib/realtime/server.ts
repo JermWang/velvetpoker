@@ -463,20 +463,23 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
       room.showCards(userId);
       break;
     case "LEAVE_TABLE": {
-      // You can't pick chips up out of a live pot. Make the player finish the
-      // current hand before leaving — this also prevents a cash-out of the
-      // stale pre-hand stack (which would create chips).
+      // Leaving during a live hand: fold them out and queue the seat to be cashed
+      // out + freed once the hand SETTLES (a stack can't be lifted out of a live
+      // pot — that would create chips). No "wait until the hand finishes" lockup;
+      // they forfeit the hand (leaving does that anyway) and keep watching.
       if (room.isInActiveHand(userId)) {
+        room.foldAndLeaveAfterHand(userId);
         sendTo(client, {
           t: "ERROR",
-          message: "You can leave once the current hand finishes",
+          message:
+            "Folded and leaving — your chips return when the hand ends. Keep watching or take a seat again.",
         });
-        break;
+        break; // keep connected so the game keeps running for them
       }
-      // Demo chips are free — just vacate the seat, nothing to settle.
+      // Demo chips are free — just vacate the seat, nothing to settle. Keep the
+      // client connected so they can keep watching the table.
       if (entry.isDemo) {
         room.leave(userId);
-        entry.clients.delete(client);
         break;
       }
 
@@ -527,8 +530,7 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
         room.endSettle(userId);
       }
       room.leave(userId);
-      entry.clients.delete(client);
-      break;
+      break; // keep connected — they spectate the game after leaving
     }
     case "SEND_CHAT":
       entry.room.broadcastTableState(); // ensure state fresh
