@@ -142,6 +142,32 @@ async function createRoom(tableId: string): Promise<RoomEntry | null> {
       isPrivate: table.visibility === "PRIVATE",
     });
 
+    // Auto-refund an abandoned buy-in: when the room gives up on a disconnected
+    // player who never returned, cash their remaining stack back to the ledger
+    // (available balance). Returns false on a ledger error so the room keeps the
+    // seat + locked funds and retries — funds are never lost or double-paid.
+    room.onCashOutSeat = async (playerId, amount) => {
+      try {
+        await cashOutSeat({
+          userId: playerId,
+          asset: table.asset,
+          amount,
+          tableId: table.id,
+          correlationId: `abandon-cashout:${playerId}:${Date.now()}`,
+        });
+        return true;
+      } catch (err) {
+        console.error("[ws] abandon cash-out failed", err);
+        void recordOpsFailure(
+          `abandon cash-out FAILED for user ${playerId} table ${table.id} amount ${amount}: ${String(
+            err,
+          )} — funds remain safely locked at the table; will retry.`,
+          { kind: "abandon_cashout_failed", userId: playerId, tableId: table.id },
+        );
+        return false;
+      }
+    };
+
     // CRASH RECOVERY: if this process restarted with players still holding funds
     // locked at this table, rebuild their seats from the ledger so the money is
     // never stranded. Stacks are the authoritative net USER_TABLE_LOCKED per
@@ -464,6 +490,12 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
           sendTo(client, { t: "ERROR", message: "Couldn't cash out right now — please try again." });
           break;
         }
+        // Guard against a double refund if an abandon-timeout is mid-cash-out for
+        // this same seat (the player reconnected and hit Leave during it).
+        if (!room.beginSettle(userId)) {
+          sendTo(client, { t: "ERROR", message: "Cashing you out — one moment, then try again." });
+          break;
+        }
         room.setSitOut(userId, true);
         try {
           await cashOutSeat({
@@ -484,9 +516,11 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
           // Funds are still safely locked and the seat is intact — restore the
           // player so nothing is lost, and let them retry leaving.
           room.setSitOut(userId, false);
+          room.endSettle(userId);
           sendTo(client, { t: "ERROR", message: "Couldn't cash out right now — please try again." });
           break;
         }
+        room.endSettle(userId);
       }
       room.leave(userId);
       entry.clients.delete(client);
@@ -645,9 +679,10 @@ export function startServer(
         // into the same hand; freed automatically if they don't return.
         entry.room.markDisconnected(client.userId);
       } else {
-        // Real-money seats stay (marked offline) so the player can reconnect;
-        // their funds remain locked until they leave.
-        entry.room.setConnected(client.userId, false);
+        // Real-money: hold the seat (funds stay locked) so a refresh/brief drop
+        // reconnects into it; if they never return, the room auto-cashes their
+        // stack back to their balance and frees the seat (abandoned buy-in).
+        entry.room.markDisconnectedRealMoney(client.userId);
       }
     });
   });

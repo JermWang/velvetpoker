@@ -135,6 +135,9 @@ export class TableRoom {
   // Demo/free-play only: brief window to reconnect (e.g. a page refresh) before a
   // disconnected seat is freed, so an accidental refresh drops you back in.
   private disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Seats with a cash-out in flight — guards against a double refund when an
+   *  explicit leave and an abandon-timeout race for the same seat. */
+  private settling = new Set<string>();
   // The most recent uncontested winner (everyone folded). They may OPTIONALLY
   // reveal their hand via showCards() until the next hand starts. Null otherwise.
   private lastUncontestedWinner: { playerId: string; seat: number; cards: Card[] } | null = null;
@@ -166,6 +169,13 @@ export class TableRoom {
   onHandStarted?: (info: HandStartedInfo) => void | Promise<void>;
   /** Hook invoked when a hand completes, for finalizing rows. */
   onHandCompleted?: (info: HandCompletedInfo) => void | Promise<void>;
+  /**
+   * Hook to cash a seat's stack back to the ledger when the room must remove a
+   * real-money player who disconnected and never returned. Returns true once the
+   * ledger cash-out succeeded (then the seat is freed); false keeps the seat +
+   * locked funds for a later retry. Demo tables leave this unset.
+   */
+  onCashOutSeat?: (playerId: string, amount: bigint) => Promise<boolean>;
 
   constructor(config: RoomConfig, io: { send: SendFn; broadcast: BroadcastFn }) {
     this.config = config;
@@ -374,6 +384,62 @@ export class TableRoom {
     this.disconnectTimers.set(playerId, t);
   }
 
+  /** A cash-out is starting for this seat; returns false if one is already in
+   *  flight (the caller should skip, to avoid double-refunding the same stack). */
+  beginSettle(playerId: string): boolean {
+    if (this.settling.has(playerId)) return false;
+    this.settling.add(playerId);
+    return true;
+  }
+  endSettle(playerId: string): void {
+    this.settling.delete(playerId);
+  }
+
+  /**
+   * Real-money: a player's socket dropped. Hold their seat (funds stay locked)
+   * for a grace window so a refresh/brief drop reconnects into the same seat; if
+   * they never come back, cash their stack back to their balance and free the
+   * seat — an abandoned buy-in is always returned, never stuck at the table.
+   * Reconnecting (setConnected(true)) cancels the timer.
+   */
+  markDisconnectedRealMoney(playerId: string): void {
+    this.setConnected(playerId, false);
+    if (this.disconnectTimers.has(playerId)) return;
+    const t = setTimeout(() => {
+      void this.handleAbandon(playerId);
+    }, TableRoom.ABANDON_GRACE_MS);
+    this.disconnectTimers.set(playerId, t);
+  }
+
+  private async handleAbandon(playerId: string): Promise<void> {
+    this.disconnectTimers.delete(playerId);
+    const seat = this.findSeatByPlayer(playerId);
+    if (!seat || seat.connected) return; // gone, or reconnected during the grace
+    // Can't settle mid-hand (chips are in the pot); the action timer folds them,
+    // so re-arm and retry once the hand is over.
+    if (this.isInActiveHand(playerId)) {
+      this.markDisconnectedRealMoney(playerId);
+      return;
+    }
+    const amount = seat.stack;
+    if (amount > 0n) {
+      if (!this.onCashOutSeat) return; // no ledger hook → never strand funds
+      if (!this.beginSettle(playerId)) return; // an explicit leave is settling it
+      let ok = false;
+      try {
+        ok = await this.onCashOutSeat(playerId, amount);
+      } finally {
+        this.endSettle(playerId);
+      }
+      if (!ok) {
+        // Ledger hiccup — keep the seat + locked funds and retry after a grace.
+        this.markDisconnectedRealMoney(playerId);
+        return;
+      }
+    }
+    this.leave(playerId);
+  }
+
   /** Current table stack for a seated player (0 if not seated). */
   stackOf(playerId: string): bigint {
     return this.findSeatByPlayer(playerId)?.stack ?? 0n;
@@ -415,6 +481,9 @@ export class TableRoom {
   private static readonly BOT_FILL_DELAY_MS = 30_000;
   /** Grace for a disconnected demo seat to reconnect (refresh) before it frees. */
   private static readonly DISCONNECT_GRACE_MS = 45_000;
+  /** Grace for a disconnected real-money seat before its stack is auto-cashed
+   *  out to the player's balance and the seat freed (abandoned buy-in). */
+  private static readonly ABANDON_GRACE_MS = 120_000;
 
   private isBotSeat(s: RoomSeat): boolean {
     return isBotId(s.playerId);
