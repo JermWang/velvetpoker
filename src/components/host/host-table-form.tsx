@@ -9,6 +9,16 @@ import { ConnectButton } from "@/components/auth/connect-button";
 import { HelpHint } from "@/components/ui/tooltip";
 import { authedFetch } from "@/lib/auth/privy-token";
 
+// Tidy a shorthand decimal on blur so the field shows a clean value
+// (".3" -> "0.3", "3." -> "3"). The server accepts either form regardless.
+function normalizeDecimalField(e: React.FocusEvent<HTMLInputElement>) {
+  let s = e.target.value.trim();
+  if (!s) return;
+  if (s.startsWith(".")) s = `0${s}`;
+  if (s.endsWith(".")) s = s.slice(0, -1);
+  e.target.value = s;
+}
+
 export function HostTableForm({
   authed,
   tokenConfigured,
@@ -153,19 +163,19 @@ export function HostTableForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="smallBlind">Small blind</Label>
-              <Input id="smallBlind" name="smallBlind" placeholder="0.01" required />
+              <Input id="smallBlind" name="smallBlind" placeholder="0.01" inputMode="decimal" onBlur={normalizeDecimalField} required />
             </div>
             <div>
               <Label htmlFor="bigBlind">Big blind</Label>
-              <Input id="bigBlind" name="bigBlind" placeholder="0.02" required />
+              <Input id="bigBlind" name="bigBlind" placeholder="0.02" inputMode="decimal" onBlur={normalizeDecimalField} required />
             </div>
             <div>
               <Label htmlFor="minBuyIn">Min buy-in</Label>
-              <Input id="minBuyIn" name="minBuyIn" placeholder="1" required />
+              <Input id="minBuyIn" name="minBuyIn" placeholder="1" inputMode="decimal" onBlur={normalizeDecimalField} required />
             </div>
             <div>
               <Label htmlFor="maxBuyIn">Max buy-in</Label>
-              <Input id="maxBuyIn" name="maxBuyIn" placeholder="4" required />
+              <Input id="maxBuyIn" name="maxBuyIn" placeholder="4" inputMode="decimal" onBlur={normalizeDecimalField} required />
             </div>
           </div>
 

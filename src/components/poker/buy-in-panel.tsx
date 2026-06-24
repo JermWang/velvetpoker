@@ -6,6 +6,15 @@ import { Input, Label } from "@/components/ui/input";
 import { formatAmount, parseAmount, ASSET_SYMBOLS } from "@/lib/ledger/money";
 import type { Asset } from "@/lib/ledger/money";
 
+// Tidy a shorthand decimal (".3" -> "0.3", "3." -> "3"). The parser accepts both.
+function normalizeDecimal(v: string): string {
+  let s = v.trim();
+  if (!s) return v;
+  if (s.startsWith(".")) s = `0${s}`;
+  if (s.endsWith(".")) s = s.slice(0, -1);
+  return s;
+}
+
 export function BuyInPanel({
   asset,
   minBuyIn,
@@ -109,6 +118,7 @@ export function BuyInPanel({
           id="buyin"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
+          onBlur={() => setAmount(normalizeDecimal(amount))}
           inputMode="decimal"
         />
         {requiresPassword && (

@@ -85,11 +85,32 @@ export async function POST(req: Request) {
     }
 
     const asset = c.asset;
-    const smallBlind = parseAmount(asset, c.smallBlind);
-    const bigBlind = parseAmount(asset, c.bigBlind);
-    const minBuyIn = parseAmount(asset, c.minBuyIn);
-    const maxBuyIn = parseAmount(asset, c.maxBuyIn);
+    let smallBlind: bigint;
+    let bigBlind: bigint;
+    let minBuyIn: bigint;
+    let maxBuyIn: bigint;
+    try {
+      smallBlind = parseAmount(asset, c.smallBlind);
+      bigBlind = parseAmount(asset, c.bigBlind);
+      minBuyIn = parseAmount(asset, c.minBuyIn);
+      maxBuyIn = parseAmount(asset, c.maxBuyIn);
+    } catch (err) {
+      // A malformed number is player input, not a server fault — 400, not 500.
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "Invalid blind or buy-in amount" },
+        { status: 400 },
+      );
+    }
 
+    // Hosts set their own stakes freely. The ONLY rules are the ones a poker game
+    // mathematically requires — positive amounts, big blind above the small
+    // blind, and a max buy-in at least the min. No arbitrary floors or ratios.
+    if (smallBlind <= 0n || bigBlind <= 0n || minBuyIn <= 0n || maxBuyIn <= 0n) {
+      return NextResponse.json(
+        { error: "Blinds and buy-ins must be greater than zero" },
+        { status: 400 },
+      );
+    }
     if (bigBlind <= smallBlind) {
       return NextResponse.json(
         { error: "Big blind must exceed small blind" },

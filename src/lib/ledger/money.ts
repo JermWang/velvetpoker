@@ -44,7 +44,9 @@ export class MoneyParseError extends Error {}
 function parseDecimalToBaseUnits(input: string, decimals: number): bigint {
   const trimmed = input.trim();
   if (trimmed === "") throw new MoneyParseError("Amount is empty");
-  if (!/^\d+(\.\d+)?$/.test(trimmed)) {
+  // Accept a leading or trailing dot as shorthand (".3" === "0.3", "3." === "3")
+  // so a perfectly valid amount isn't rejected over a missing zero.
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(trimmed)) {
     throw new MoneyParseError(`Invalid amount: "${input}"`);
   }
 
