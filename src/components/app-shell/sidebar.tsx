@@ -27,6 +27,10 @@ export function Sidebar() {
           <Link
             key={item.href}
             href={item.href}
+            // Don't viewport-prefetch every dynamic route at once — that opened a
+            // burst of DB connections per page and tripped Prisma on serverless.
+            // Still prefetches on hover, so navigation stays snappy.
+            prefetch={false}
             title={item.hint}
             className={cn(
               // Tight left padding — labels sit close to the rail edge; any slack
