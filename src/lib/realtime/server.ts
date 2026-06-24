@@ -346,10 +346,14 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
           correlationId: `buyin:${userId}:${Date.now()}`,
         });
       } catch (err) {
-        sendTo(client, {
-          t: "ERROR",
-          message: err instanceof Error ? err.message : "Buy-in failed",
-        });
+        const raw = err instanceof Error ? err.message : "";
+        // The raw ledger error leaks an internal id and says "available balance".
+        // Translate it: real-money play needs DEPOSITED funds — a wallet balance
+        // alone isn't enough until it's deposited on the Cashier.
+        const message = raw.includes("Insufficient available balance")
+          ? `Not enough deposited ${table.asset} to buy in. Funds in your wallet must be deposited first — open the Cashier to deposit, then take your seat.`
+          : raw || "Buy-in failed";
+        sendTo(client, { t: "ERROR", message });
         break;
       }
       // Seat the player. If seating fails for ANY reason (full table, or a race
