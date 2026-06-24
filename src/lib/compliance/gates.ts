@@ -16,9 +16,7 @@ export function getComplianceProvider(): ComplianceProvider {
 
 export type GateCode =
   | "ACCOUNT_NOT_ACTIVE"
-  | "GEO_NOT_ALLOWED"
   | "SELF_EXCLUDED"
-  | "AGE_NOT_VERIFIED"
   | "RESPONSIBLE_GAMING_BLOCK";
 
 export interface GateFailure {
@@ -41,33 +39,18 @@ export function evaluateRealMoneyGates(user: User): GateResult {
   const failures: GateFailure[] = [];
   const now = new Date();
 
-  if (user.status !== "ACTIVE") {
-    if (user.status === "SELF_EXCLUDED") {
-      failures.push({
-        code: "SELF_EXCLUDED",
-        message: "Your account is self-excluded from real-money play.",
-      });
-    } else {
-      failures.push({
-        code: "ACCOUNT_NOT_ACTIVE",
-        message: `Your account status is ${user.status}.`,
-      });
-    }
-  }
-
-  // No KYC / identity verification required — wallet-native, privacy-first play.
-
-  if (user.geofenceStatus !== "ALLOWED") {
+  // Wallet-native, privacy-first play: NO KYC, NO age-verification step, and NO
+  // in-app geofence gate (the 18+ acknowledgement lives on the splash page).
+  // Play is only ever blocked for a genuinely restricted account.
+  if (user.status === "SELF_EXCLUDED") {
     failures.push({
-      code: "GEO_NOT_ALLOWED",
-      message: "Real-money play is not available in your location.",
+      code: "SELF_EXCLUDED",
+      message: "Your account is self-excluded from real-money play.",
     });
-  }
-
-  if (!user.ageVerifiedAt) {
+  } else if (user.status !== "ACTIVE") {
     failures.push({
-      code: "AGE_NOT_VERIFIED",
-      message: "You must confirm you meet the minimum age requirement.",
+      code: "ACCOUNT_NOT_ACTIVE",
+      message: `Your account status is ${user.status}.`,
     });
   }
 

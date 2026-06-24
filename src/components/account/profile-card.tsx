@@ -6,31 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { initials } from "@/lib/utils";
 import { authedFetch } from "@/lib/auth/privy-token";
-
-/** Resize/crop an image file to a centered square data URL (JPEG) client-side. */
-async function toSquareJpeg(file: File, size = 256): Promise<string> {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const i = new Image();
-      i.onload = () => resolve(i);
-      i.onerror = () => reject(new Error("Could not read image"));
-      i.src = url;
-    });
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Canvas unavailable");
-    const scale = Math.max(size / img.width, size / img.height);
-    const w = img.width * scale;
-    const h = img.height * scale;
-    ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
-    return canvas.toDataURL("image/jpeg", 0.85);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
+import { AvatarCropper } from "./avatar-cropper";
 
 export function ProfileCard({
   displayName,
@@ -46,8 +22,9 @@ export function ProfileCard({
   const [busy, setBusy] = useState<null | "avatar" | "name">(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
-  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-picking the same file
     if (!file) return;
@@ -56,9 +33,13 @@ export function ProfileCard({
       return;
     }
     setError(null);
+    setCropFile(file); // open the cropper; the upload happens on "Use photo"
+  }
+
+  async function uploadCropped(dataUrl: string) {
+    setError(null);
     setBusy("avatar");
     try {
-      const dataUrl = await toSquareJpeg(file);
       const res = await authedFetch("/api/account/avatar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -67,6 +48,7 @@ export function ProfileCard({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Upload failed");
       setPreview(json.avatarUrl);
+      setCropFile(null);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -102,6 +84,19 @@ export function ProfileCard({
 
   return (
     <div className="space-y-5">
+      {cropFile && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+          <p className="mb-3 text-center text-sm font-medium text-ivory">
+            Position &amp; crop your photo
+          </p>
+          <AvatarCropper
+            file={cropFile}
+            busy={busy === "avatar"}
+            onCancel={() => setCropFile(null)}
+            onCropped={uploadCropped}
+          />
+        </div>
+      )}
       <div className="flex items-center gap-4">
         <div className="relative">
           {preview ? (

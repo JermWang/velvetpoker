@@ -167,19 +167,21 @@ export function Card3D({
               backfaceVisibility: "hidden",
               transform: `rotateY(180deg) translateZ(${half}px)`,
               overflow: "hidden",
-              // Cream base + velvet-red border (was near-black, hard to see on felt).
-              background:
-                "radial-gradient(125% 120% at 50% -8%, #faf8f1 0%, #f2eee2 70%, #e9e3d3 100%)",
-              boxShadow:
-                "inset 0 0 0 1px rgba(143,29,44,0.6), inset 0 0 0 4px rgba(250,248,241,1), inset 0 0 0 5px rgba(143,29,44,0.32)",
+              // Clean cream/white card border frame.
+              background: "#f4efe3",
+              boxShadow: "inset 0 0 0 1px rgba(143,29,44,0.35)",
             }}
           >
+            {/* Red lattice lives only on the inner grey panel, inset from the
+                white border so the frame stays clean. */}
             <div
               style={{
                 position: "absolute",
-                inset: 0,
+                inset: "11%",
+                borderRadius: "8%",
                 background:
-                  "repeating-linear-gradient(45deg, rgba(143,29,44,0.3) 0 1.5px, transparent 1.5px 8px), repeating-linear-gradient(-45deg, rgba(143,29,44,0.3) 0 1.5px, transparent 1.5px 8px)",
+                  "repeating-linear-gradient(45deg, rgba(143,29,44,0.32) 0 1.5px, transparent 1.5px 8px), repeating-linear-gradient(-45deg, rgba(143,29,44,0.32) 0 1.5px, transparent 1.5px 8px), #dad5ca",
+                boxShadow: "inset 0 0 0 1px rgba(143,29,44,0.3)",
               }}
             />
             <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>

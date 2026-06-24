@@ -33,27 +33,26 @@ export function PlayingCard({
   if (faceDown || !card) {
     return (
       <div
-        className="shrink-0"
+        className="relative shrink-0"
         style={{
           width: S.w,
           height: S.h,
           borderRadius: S.r,
-          // Cream base with a velvet-red border so face-down cards read clearly
-          // against the dark felt (the old near-black back was hard to see).
-          background:
-            "radial-gradient(125% 120% at 50% -8%, #faf8f1 0%, #f2eee2 70%, #e9e3d3 100%)",
-          boxShadow:
-            "inset 0 0 0 1px rgba(143,29,44,0.6), inset 0 0 0 3px rgba(250,248,241,1), inset 0 0 0 4px rgba(143,29,44,0.32)",
+          // Clean cream/white card border frame.
+          background: "#f4efe3",
+          boxShadow: "inset 0 0 0 1px rgba(143,29,44,0.35)",
         }}
       >
+        {/* Inner panel: the red lattice lives ONLY here, inset from the white
+            border so the frame stays clean. */}
         <div
           style={{
-            width: "100%",
-            height: "100%",
-            borderRadius: S.r,
-            // Red lattice on cream — a classic card back.
+            position: "absolute",
+            inset: Math.round(S.w * 0.13),
+            borderRadius: Math.max(2, S.r - 3),
             background:
-              "repeating-linear-gradient(45deg, rgba(143,29,44,0.3) 0 1.5px, transparent 1.5px 7px), repeating-linear-gradient(-45deg, rgba(143,29,44,0.3) 0 1.5px, transparent 1.5px 7px)",
+              "repeating-linear-gradient(45deg, rgba(143,29,44,0.32) 0 1.5px, transparent 1.5px 7px), repeating-linear-gradient(-45deg, rgba(143,29,44,0.32) 0 1.5px, transparent 1.5px 7px), #dad5ca",
+            boxShadow: "inset 0 0 0 1px rgba(143,29,44,0.3)",
           }}
         />
       </div>
