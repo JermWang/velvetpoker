@@ -77,15 +77,30 @@ export function HostTableForm({
       spectatorsAllowed: form.get("spectatorsAllowed") === "on",
     };
 
-    const res = await authedFetch("/api/tables", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const json = await res.json();
+    let res: Response;
+    try {
+      res = await authedFetch("/api/tables", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      setSubmitting(false);
+      setError("Couldn't reach the server — check your connection and try again.");
+      return;
+    }
+    // Parse defensively: an error response can come back empty / non-JSON, which
+    // must never leave the button stuck on "Creating…".
+    const json = (await res.json().catch(() => null)) as
+      | { id?: string; error?: string }
+      | null;
     setSubmitting(false);
     if (!res.ok) {
-      setError(json.error ?? "Could not create the table");
+      setError(json?.error ?? `Could not create the table (error ${res.status}).`);
+      return;
+    }
+    if (!json?.id) {
+      setError("Table created, but no id came back. Please refresh and check the lobby.");
       return;
     }
     router.push(`/app/tables/${json.id}`);

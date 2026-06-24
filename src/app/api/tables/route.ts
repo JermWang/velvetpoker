@@ -23,64 +23,67 @@ const createSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const limited = tooMany(req, "table-create", { capacity: 8, refillPerSec: 0.1 });
-  if (limited) return limited;
-
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  let body: unknown;
+  // One outer try/catch so this handler ALWAYS responds with JSON — an unhandled
+  // throw here used to return an empty-body 500, which the client then tried to
+  // `res.json()` (→ "Unexpected end of JSON input") and hung on "Creating…".
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+    const limited = tooMany(req, "table-create", { capacity: 8, refillPerSec: 0.1 });
+    if (limited) return limited;
 
-  const parsed = createSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Invalid input", details: parsed.error.flatten() },
-      { status: 400 },
-    );
-  }
-  const c = parsed.data;
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Asset/visibility policy:
-  //  - PUBLIC tables may ONLY be denominated in the custom token.
-  //  - PRIVATE tables may use SOL, USDC, or the token.
-  //  - The token is only selectable once its mint is configured.
-  if ((c.asset === "TOKEN") && !isTokenConfigured()) {
-    return NextResponse.json(
-      { error: "Token play is not available yet" },
-      { status: 400 },
-    );
-  }
-  if (c.visibility === "PUBLIC" && c.asset !== "TOKEN") {
-    return NextResponse.json(
-      {
-        error: `Public tables must use ${env.tokenSymbol}. Choose SOL or USDC only for private tables.`,
-      },
-      { status: 400 },
-    );
-  }
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
 
-  // Server-overload guard: cap concurrent private games. When full, host has to
-  // wait for one to free up.
-  if (c.visibility === "PRIVATE") {
-    const active = await prisma.pokerTable.count({
-      where: { visibility: "PRIVATE", status: { in: ["WAITING", "ACTIVE"] } },
-    });
-    if (active >= env.maxPrivateTables) {
+    const parsed = createSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        {
-          error: `All private tables are full (${active}/${env.maxPrivateTables}). Please wait for one to open up.`,
-        },
-        { status: 503 },
+        { error: "Invalid input", details: parsed.error.flatten() },
+        { status: 400 },
       );
     }
-  }
+    const c = parsed.data;
 
-  try {
+    // Asset/visibility policy:
+    //  - PUBLIC tables may ONLY be denominated in the custom token.
+    //  - PRIVATE tables may use SOL, USDC, or the token.
+    //  - The token is only selectable once its mint is configured.
+    if (c.asset === "TOKEN" && !isTokenConfigured()) {
+      return NextResponse.json(
+        { error: "Token play is not available yet" },
+        { status: 400 },
+      );
+    }
+    if (c.visibility === "PUBLIC" && c.asset !== "TOKEN") {
+      return NextResponse.json(
+        {
+          error: `Public tables must use ${env.tokenSymbol}. Choose SOL or USDC only for private tables.`,
+        },
+        { status: 400 },
+      );
+    }
+
+    // Server-overload guard: cap concurrent private games. When full, host has to
+    // wait for one to free up.
+    if (c.visibility === "PRIVATE") {
+      const active = await prisma.pokerTable.count({
+        where: { visibility: "PRIVATE", status: { in: ["WAITING", "ACTIVE"] } },
+      });
+      if (active >= env.maxPrivateTables) {
+        return NextResponse.json(
+          {
+            error: `All private tables are full (${active}/${env.maxPrivateTables}). Please wait for one to open up.`,
+          },
+          { status: 503 },
+        );
+      }
+    }
+
     const asset = c.asset;
     const smallBlind = parseAmount(asset, c.smallBlind);
     const bigBlind = parseAmount(asset, c.bigBlind);
@@ -131,9 +134,12 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ id: table.id, inviteCode: table.inviteCode });
   } catch (err) {
+    // Surface the real reason in Railway logs, and always return JSON so the
+    // client can show a proper error instead of spinning forever.
+    console.error("[/api/tables] create failed:", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to create table" },
-      { status: 400 },
+      { status: 500 },
     );
   }
 }

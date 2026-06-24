@@ -94,17 +94,17 @@ export default function StartScreen() {
         </div>
       </main>
 
-      {/* Slim compliance footer */}
-      <footer className="relative z-10 flex w-full max-w-6xl flex-col items-center gap-2 pb-1 text-center">
-        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-ash/70">
+      {/* Slim compliance footer — even vertical rhythm: equal gap between the
+          link row and the 18+ line, and a touch of room off the bottom edge. */}
+      <footer className="relative z-10 flex w-full max-w-6xl flex-col items-center gap-3 pb-4 text-center">
+        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-ash/70">
           <Link href="/legal/rules" className="hover:text-ivory">Game rules</Link>
           <Link href="/legal/responsible-gaming" className="hover:text-ivory">Responsible play</Link>
           <Link href="/legal/terms" className="hover:text-ivory">Terms</Link>
           <Link href="/legal/privacy" className="hover:text-ivory">Privacy</Link>
         </div>
         <p className="text-[11px] text-ash/40">
-          18+ where permitted. Real-money play subject to geographic
-          eligibility.
+          18+ where permitted. Real-money play subject to geographic eligibility.
         </p>
       </footer>
     </div>

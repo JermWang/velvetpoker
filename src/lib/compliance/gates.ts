@@ -35,33 +35,12 @@ export interface GateResult {
  * schedule / on demand and updates the User record); it reads the resolved
  * status so gameplay checks are fast and deterministic.
  */
-export function evaluateRealMoneyGates(user: User): GateResult {
-  const failures: GateFailure[] = [];
-  const now = new Date();
-
-  // Wallet-native, privacy-first play: NO KYC, NO age-verification step, and NO
-  // in-app geofence gate (the 18+ acknowledgement lives on the splash page).
-  // Play is only ever blocked for a genuinely restricted account.
-  if (user.status === "SELF_EXCLUDED") {
-    failures.push({
-      code: "SELF_EXCLUDED",
-      message: "Your account is self-excluded from real-money play.",
-    });
-  } else if (user.status !== "ACTIVE") {
-    failures.push({
-      code: "ACCOUNT_NOT_ACTIVE",
-      message: `Your account status is ${user.status}.`,
-    });
-  }
-
-  if (user.selfExcludedUntil && user.selfExcludedUntil > now) {
-    failures.push({
-      code: "RESPONSIBLE_GAMING_BLOCK",
-      message: `A responsible-gaming limit is active until ${user.selfExcludedUntil.toISOString()}.`,
-    });
-  }
-
-  return { allowed: failures.length === 0, failures };
+export function evaluateRealMoneyGates(_user: User): GateResult {
+  // ALL real-money play gates are intentionally disabled: no KYC, no
+  // age-verification, no geofence, no eligibility, no self-exclusion gate.
+  // Anyone who connects a wallet can play. (Kept as a function returning the
+  // same shape so every caller and the gate-card UI keep compiling.)
+  return { allowed: true, failures: [] };
 }
 
 /** Convenience boolean used in hot paths (joining/buying in). */
