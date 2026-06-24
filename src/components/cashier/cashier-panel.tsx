@@ -182,7 +182,7 @@ export function CashierPanel({
                   <button
                     type="button"
                     onClick={() => setWAmount(availableFor(wAsset))}
-                    className="ml-2 rounded border border-white/12 px-1.5 py-px text-[10px] text-velvet hover:text-ivory"
+                    className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-velvet transition-colors hover:text-ivory hover:underline underline-offset-2"
                   >
                     Max
                   </button>
@@ -205,7 +205,7 @@ export function CashierPanel({
                   <button
                     type="button"
                     onClick={() => setWTo(connectedWallet)}
-                    className="rounded border border-white/12 px-1.5 py-px text-[10px] text-velvet hover:text-ivory"
+                    className="text-[10px] font-semibold uppercase tracking-wide text-velvet transition-colors hover:text-ivory hover:underline underline-offset-2"
                     title={connectedWallet}
                   >
                     Use connected wallet
