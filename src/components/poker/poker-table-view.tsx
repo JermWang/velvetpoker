@@ -613,13 +613,22 @@ export function PokerTableView(props: PokerTableViewProps) {
             const inset = isSide ? 0.34 : 0.52;
             const bx = pos.x + (50 - pos.x) * inset;
             const by = pos.y + (50 - pos.y) * inset;
+            // Mirror the chip+amount on the right so the medallion always sits on
+            // the SEAT side. With a fixed [chip][amount] order the medallion drifts
+            // center-ward on the right, making those chips look more inward.
+            const onRight = pos.x > 50;
             return (
               <div
                 key={`bet-${s.seat}`}
                 className="absolute z-[4] -translate-x-1/2 -translate-y-1/2"
                 style={{ left: `${bx}%`, top: `${by}%` }}
               >
-                <div className="animate-chip-in flex items-center gap-1.5">
+                <div
+                  className={cn(
+                    "animate-chip-in flex items-center gap-1.5",
+                    onRight && "flex-row-reverse",
+                  )}
+                >
                   <Chip size={18} />
                   <span className="rounded-full border border-white/8 bg-charcoal-900/80 px-2 py-px font-mono text-[10px] text-ivory">
                     {formatAmount(props.asset, bet)}
@@ -709,33 +718,24 @@ export function PokerTableView(props: PokerTableViewProps) {
               const nameFor = (seat: number) =>
                 table?.seats.find((s) => s.seat === seat)?.displayName ??
                 `Seat ${seat + 1}`;
-              const results = [...state.lastShowdown.results].sort((a, b) => {
-                const d = BigInt(b.amountWon) - BigInt(a.amountWon);
-                return d > 0n ? 1 : d < 0n ? -1 : 0;
-              });
+              const winners = state.lastShowdown.results.filter(
+                (r) => BigInt(r.amountWon) > 0n,
+              );
+              if (winners.length === 0) return null;
+              // Compact winners-only pill. Each player's revealed cards + hand
+              // rank already show under their pod, so the old full result list
+              // just covered them. Small, centered, out of the way.
               return (
-                <div className="absolute inset-x-4 top-1 z-[8] mx-auto max-w-md rounded-xl border border-velvet/30 bg-charcoal-900/95 p-2.5 backdrop-blur">
-                  <p className="mb-1 text-[11px] uppercase tracking-wider text-ash">
-                    Showdown
-                  </p>
-                  <ul className="space-y-0.5 text-sm">
-                    {results.map((r) => {
-                      const won = BigInt(r.amountWon);
-                      return (
-                        <li
-                          key={r.seat}
-                          className={won > 0n ? "text-ivory" : "text-ash/70"}
-                        >
-                          <span className={won > 0n ? "font-medium text-velvet-soft" : ""}>
-                            {nameFor(r.seat)}
-                          </span>{" "}
-                          {won > 0n
-                            ? `wins ${formatAmount(props.asset, won)} ${unit} · ${r.handDescription}`
-                            : r.handDescription}
-                        </li>
-                      );
-                    })}
-                  </ul>
+                <div className="absolute left-1/2 top-1 z-[8] flex max-w-[92%] -translate-x-1/2 flex-wrap justify-center gap-x-2 rounded-full border border-amber-300/40 bg-charcoal-900/90 px-3 py-1 text-xs shadow-elevated backdrop-blur">
+                  {winners.map((r) => (
+                    <span key={r.seat} className="whitespace-nowrap text-ivory">
+                      <span className="font-semibold text-amber-200">
+                        {nameFor(r.seat)}
+                      </span>{" "}
+                      wins {formatAmount(props.asset, BigInt(r.amountWon))} {unit}
+                      {r.handDescription ? ` · ${r.handDescription}` : ""}
+                    </span>
+                  ))}
                 </div>
               );
             })()}
@@ -1012,7 +1012,12 @@ function seatPosition(
   // rx leaves room for the ~100px-wide seat clusters at the sides; ry is kept
   // modest and the ring sits a touch low so the TOP-row seats keep their cards
   // clear of the felt edge (with the felt's top padding adding more headroom).
-  return { x: 50 + 44 * Math.cos(angle), y: 50 + 37 * Math.sin(angle) };
+  // Top/bottom-center seats sit further from the rail than the side seats, which
+  // hug the left/right edge. Give the center seats a taller vertical radius so
+  // they hug the top/bottom edge too.
+  const cos = Math.cos(angle);
+  const ry = Math.abs(cos) < 0.2 ? 42 : 37;
+  return { x: 50 + 44 * cos, y: 50 + ry * Math.sin(angle) };
 }
 
 /**
