@@ -2,10 +2,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { CardFan } from "@/components/marketing/card-fan";
+import { PayoutTicker } from "@/components/marketing/payout-ticker";
 
 export default function StartScreen() {
   return (
-    <div className="relative isolate flex min-h-screen flex-col items-center justify-between px-6 py-8">
+    <div className="relative isolate flex min-h-screen flex-col items-center justify-between overflow-x-clip px-6 py-8">
       {/* Landing bloom — a soft warm glow that lifts the centerpiece a touch
           brighter than the global ambient. Landing-only, sits behind content. */}
       <div aria-hidden className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
@@ -26,6 +27,9 @@ export default function StartScreen() {
           }}
         />
       </div>
+
+      {/* Live payouts ticker — real SENT withdrawals only (social proof). */}
+      <PayoutTicker />
 
       {/* Brand mark */}
       <header className="relative z-10 flex w-full max-w-6xl items-center justify-center pt-2 animate-fade-up">
