@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { formatAmount, ASSET_SYMBOLS, type Asset } from "@/lib/ledger/money";
+import { authedFetch } from "@/lib/auth/privy-token";
 
 interface AssetBalance {
   asset: Asset;
@@ -47,7 +48,7 @@ export function ReferralPanel({
   async function claim() {
     setClaiming(true);
     setMessage(null);
-    const res = await fetch("/api/referrals/claim", { method: "POST" });
+    const res = await authedFetch("/api/referrals/claim", { method: "POST" });
     const json = await res.json();
     setClaiming(false);
     if (!res.ok) {

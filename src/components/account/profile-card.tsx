@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { initials } from "@/lib/utils";
+import { authedFetch } from "@/lib/auth/privy-token";
 
 /** Resize/crop an image file to a centered square data URL (JPEG) client-side. */
 async function toSquareJpeg(file: File, size = 256): Promise<string> {
@@ -58,7 +59,7 @@ export function ProfileCard({
     setBusy("avatar");
     try {
       const dataUrl = await toSquareJpeg(file);
-      const res = await fetch("/api/account/avatar", {
+      const res = await authedFetch("/api/account/avatar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dataUrl }),
@@ -83,7 +84,7 @@ export function ProfileCard({
     setError(null);
     setBusy("name");
     try {
-      const res = await fetch("/api/account", {
+      const res = await authedFetch("/api/account", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "setDisplayName", name: trimmed }),

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Card } from "@/lib/poker/types";
+import { authedFetch } from "@/lib/auth/privy-token";
 import type { ClientEvent, ServerEvent, WireTableState } from "./events";
 
 export interface TableSocketState {
@@ -98,7 +99,7 @@ export function useTableSocket({
         try {
           const ctrl = new AbortController();
           const t = setTimeout(() => ctrl.abort(), 4000);
-          const res = await fetch("/api/realtime/ticket", {
+          const res = await authedFetch("/api/realtime/ticket", {
             cache: "no-store",
             signal: ctrl.signal,
           });

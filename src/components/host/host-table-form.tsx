@@ -7,6 +7,7 @@ import { Input, Label, Select } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConnectButton } from "@/components/auth/connect-button";
 import { HelpHint } from "@/components/ui/tooltip";
+import { authedFetch } from "@/lib/auth/privy-token";
 
 export function HostTableForm({
   authed,
@@ -76,7 +77,7 @@ export function HostTableForm({
       spectatorsAllowed: form.get("spectatorsAllowed") === "on",
     };
 
-    const res = await fetch("/api/tables", {
+    const res = await authedFetch("/api/tables", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { authedFetch } from "@/lib/auth/privy-token";
 
 /** Enter a private-table invite code and jump straight to the room. */
 export function JoinPrivate() {
@@ -16,7 +17,7 @@ export function JoinPrivate() {
     if (!code.trim()) return;
     setBusy(true);
     setError(null);
-    const res = await fetch(`/api/tables/by-code?code=${encodeURIComponent(code.trim())}`);
+    const res = await authedFetch(`/api/tables/by-code?code=${encodeURIComponent(code.trim())}`);
     const json = await res.json();
     setBusy(false);
     if (!res.ok) {

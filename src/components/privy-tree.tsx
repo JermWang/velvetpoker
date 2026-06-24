@@ -1,9 +1,24 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { PrivyProvider } from "@privy-io/react-auth";
+import { useEffect, type ReactNode } from "react";
+import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 import { PrivyConfiguredContext } from "./privy-context";
+import { setTokenGetter } from "@/lib/auth/privy-token";
+
+/**
+ * Bridges Privy's getAccessToken out to the SSR-safe token module so authedFetch
+ * (which must not import the Privy SDK) can attach a fresh Bearer token to API
+ * requests. Renders nothing.
+ */
+function TokenBridge() {
+  const { getAccessToken } = usePrivy();
+  useEffect(() => {
+    setTokenGetter(getAccessToken);
+    return () => setTokenGetter(null);
+  }, [getAccessToken]);
+  return null;
+}
 
 /**
  * The actual Privy provider tree. This is the ONLY module that imports the Privy
@@ -41,6 +56,7 @@ export default function PrivyTree({
           },
         }}
       >
+        <TokenBridge />
         {children}
       </PrivyProvider>
     </PrivyConfiguredContext.Provider>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HelpHint } from "@/components/ui/tooltip";
+import { authedFetch } from "@/lib/auth/privy-token";
 
 export function CashierPanel({
   canPlay,
@@ -49,7 +50,7 @@ export function CashierPanel({
     setLoadingAddr(true);
     setAddrError(null);
     try {
-      const res = await fetch("/api/cashier/deposit-address", { method: "POST" });
+      const res = await authedFetch("/api/cashier/deposit-address", { method: "POST" });
       const json = await res.json();
       if (res.ok) setAddress(json.address);
       else setAddrError(json.error ?? "Couldn't load a deposit address");
@@ -66,7 +67,7 @@ export function CashierPanel({
     setWError(null);
     setWMessage(null);
     const form = new FormData(e.currentTarget);
-    const res = await fetch("/api/cashier/withdraw", {
+    const res = await authedFetch("/api/cashier/withdraw", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

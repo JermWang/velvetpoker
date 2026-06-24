@@ -7,14 +7,25 @@
  * is gated on Privy being absent and is clearly separated from prod logic.
  */
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { env } from "@/lib/env";
 import { verifyPrivyToken, type SessionIdentity } from "./privy";
 
 export async function getSessionIdentity(): Promise<SessionIdentity | null> {
   const store = cookies();
 
-  const privyToken = store.get("privy-token")?.value;
+  // Prefer a fresh Bearer token from the client (Authorization header) over the
+  // privy-token cookie, which can go stale/expired while the client SDK still
+  // holds a valid token. Route handlers get the header from authedFetch; server
+  // components fall back to the cookie (no header on a browser navigation).
+  let bearer: string | undefined;
+  try {
+    const authz = headers().get("authorization");
+    if (authz && /^bearer\s+/i.test(authz)) bearer = authz.replace(/^bearer\s+/i, "").trim();
+  } catch {
+    /* headers() unavailable in this context — fall back to the cookie */
+  }
+  const privyToken = bearer || store.get("privy-token")?.value;
   if (env.privyAppId && env.privyAppSecret) {
     return verifyPrivyToken(privyToken);
   }

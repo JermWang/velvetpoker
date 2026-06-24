@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
+import { authedFetch } from "@/lib/auth/privy-token";
 
 type Action =
   | { action: "verifyAge" }
@@ -20,7 +21,7 @@ export function AccountActions() {
 
   async function call(body: Action) {
     setBusy(body.action);
-    await fetch("/api/account", {
+    await authedFetch("/api/account", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

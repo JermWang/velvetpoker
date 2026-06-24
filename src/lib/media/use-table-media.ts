@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { authedFetch } from "@/lib/auth/privy-token";
 // Types only (erased at build) — the ~heavy runtime is dynamically imported in
 // join() so it never lands in the table page's initial bundle.
 import type {
@@ -108,7 +109,7 @@ export function useTableMedia(opts: {
     setStatus("connecting");
     setError(null);
     try {
-      const res = await fetch("/api/livekit/token", {
+      const res = await authedFetch("/api/livekit/token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
