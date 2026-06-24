@@ -24,6 +24,7 @@ import { decode, encode, type ServerEvent } from "./events";
 import { verifyWsTicket } from "./ws-ticket";
 import { startBackgroundWorkers } from "@/lib/jobs/worker";
 import { sendOpsAlert } from "@/lib/risk/alert";
+import { recordOpsFailure } from "@/lib/risk/risk-events";
 
 interface Client {
   ws: WebSocket;
@@ -156,8 +157,9 @@ async function createRoom(tableId: string): Promise<RoomEntry | null> {
       }
     } catch (e) {
       console.error("[ws] seat restore failed", e);
-      sendOpsAlert(
+      void recordOpsFailure(
         `seat restore from ledger FAILED for table ${table.id}: ${String(e)} — players with locked funds may not see their seat until this is resolved.`,
+        { kind: "seat_restore_failed", tableId: table.id },
       );
     }
   }
@@ -351,10 +353,11 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
           });
         } catch (refundErr) {
           console.error("[ws] buy-in refund failed", refundErr);
-          sendOpsAlert(
+          void recordOpsFailure(
             `buy-in refund FAILED for user ${userId} table ${table.id} amount ${amount}: ${String(
               refundErr,
             )} — funds may be locked with no seat; reconcile.`,
+            { kind: "buyin_refund_failed", userId, tableId: table.id },
           );
         }
         // sit() already sent a specific ERROR for the race cases; only the
@@ -472,10 +475,11 @@ async function handleEvent(client: Client, raw: string): Promise<void> {
           });
         } catch (err) {
           console.error("[ws] cashOutSeat failed", err);
-          sendOpsAlert(
+          void recordOpsFailure(
             `cash-out FAILED for user ${userId} table ${table.id} amount ${returned}: ${String(
               err,
             )} — funds remain locked at the table; player asked to retry.`,
+            { kind: "cashout_failed", userId, tableId: table.id },
           );
           // Funds are still safely locked and the seat is intact — restore the
           // player so nothing is lost, and let them retry leaving.

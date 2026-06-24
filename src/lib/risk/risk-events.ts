@@ -10,7 +10,7 @@ import type {
   RiskSeverity,
 } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { sendRiskAlert } from "./alert";
+import { sendRiskAlert, sendOpsAlert } from "./alert";
 
 type Tx = Prisma.TransactionClient;
 
@@ -46,5 +46,28 @@ export async function recordRiskEvent(
       userId: params.userId,
       metadata: params.metadata,
     });
+  }
+}
+
+/**
+ * Record a money-critical operational FAILURE as a CRITICAL RiskEvent — a durable
+ * DB row visible via Supabase + the admin risk dashboard — and (via recordRiskEvent)
+ * fire the ops webhook too if one is configured. Use for failures that must never
+ * be silent (settlement write, cash-out, withdrawal send, seat restore). With this,
+ * the DB is a complete monitoring surface even when no webhook is set. Never throws.
+ */
+export async function recordOpsFailure(
+  detail: string,
+  metadata?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await recordRiskEvent({
+      type: "ADMIN_ACTION",
+      severity: "CRITICAL",
+      metadata: { kind: "ops_failure", detail, ...metadata },
+    });
+  } catch {
+    // Last resort if even the DB write fails: hit the webhook directly.
+    sendOpsAlert(detail);
   }
 }

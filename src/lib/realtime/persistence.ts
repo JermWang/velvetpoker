@@ -8,7 +8,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { settleHandLedger, type RakeSplit } from "@/lib/ledger/ledger";
 import { splitRakeThreeWays, splitRakePrivate } from "@/lib/poker/rake";
-import { sendOpsAlert } from "@/lib/risk/alert";
+import { recordOpsFailure } from "@/lib/risk/risk-events";
 import type { Asset } from "@prisma/client";
 
 /**
@@ -256,10 +256,11 @@ export function attachHandPersistence(
       // the live stacks now diverge from the source-of-truth ledger. Make it
       // loud — this needs immediate operator attention (and a reconciliation).
       console.error("[persist] settle failed", e);
-      sendOpsAlert(
+      void recordOpsFailure(
         `CRITICAL hand-settlement ledger write FAILED for table ${table.id} hand ${s.handId}: ${String(
           e,
         )} — in-memory stacks now diverge from the ledger; reconcile.`,
+        { kind: "settlement_write_failed", tableId: table.id, handId: s.handId },
       );
     }
   };
@@ -269,10 +270,11 @@ export function attachHandPersistence(
       await persistHandCompleted(i);
     } catch (e) {
       console.error("[persist] complete failed", e);
-      sendOpsAlert(
+      void recordOpsFailure(
         `hand-completion persistence FAILED for table ${i.tableId} hand #${i.handNumber}: ${String(
           e,
         )} — history/anchor rows may be incomplete.`,
+        { kind: "hand_completion_failed", tableId: i.tableId, handNumber: i.handNumber },
       );
     }
     hooks?.afterHandCompleted?.(i);
